@@ -1,0 +1,17 @@
+# Virtual Environment
+backend/venv/
+backend/db.sqlite3
+backend/__pycache__/
+*.pyc
+
+# Environment Files (contains database credentials and secret keys)
+backend/.env
+
+# Node Packages and Build Artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/local.env
+
+# System Files
+.DS_Store
+Thumbs.db
