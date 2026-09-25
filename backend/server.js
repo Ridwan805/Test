@@ -9,7 +9,7 @@ import User from './models/User.js';
 
 dotenv.config();
 
-// Auto-reloaded with updated environment configuration
+// Connected to MongoDB Atlas Cloud Database
 const app = express();
 
 // Connect Database

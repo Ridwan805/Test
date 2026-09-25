@@ -19,7 +19,7 @@ const generateRefreshToken = (id) => {
   return jwt.sign({ id }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 };
 
-// Helper: Real-time DNS & Domain Existence Verification
+// Helper: Real-time Email & Mailbox Verification via ZeroBounce & DNS
 const verifyEmailDomain = async (email) => {
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(email)) {
@@ -37,13 +37,48 @@ const verifyEmailDomain = async (email) => {
     return { valid: false, reason: `The domain '${domain}' is not a valid email provider.` };
   }
 
-  // 2. Trusted major email providers (pass instantly)
+  // 2. Real-time Mailbox Verification via ZeroBounce API
+  const zeroBounceKey = (process.env.ZERO_BOUNCE_API_KEY || '').replace(/['"]/g, '').trim();
+  if (zeroBounceKey) {
+    try {
+      const zbUrl = `https://api.zerobounce.net/v2/validate?api_key=${encodeURIComponent(zeroBounceKey)}&email=${encodeURIComponent(email)}`;
+      const res = await fetch(zbUrl, { signal: AbortSignal.timeout(6000) });
+      if (res.ok) {
+        const data = await res.json();
+        console.log(`[ZeroBounce] Validated ${email}: status=${data.status}, sub_status=${data.sub_status}`);
+
+        if (data.status === 'invalid') {
+          let reason = 'This email address does not exist or cannot receive mail.';
+          if (data.sub_status === 'mailbox_not_found') {
+            reason = 'This email mailbox was not found. Please provide an active email address.';
+          } else if (data.sub_status === 'disposable') {
+            reason = 'Disposable email addresses are not permitted.';
+          } else if (data.did_you_mean) {
+            reason = `Email address not found. Did you mean ${data.did_you_mean}?`;
+          }
+          return { valid: false, reason };
+        }
+
+        if (['spamtrap', 'abuse', 'do_not_mail'].includes(data.status)) {
+          return { valid: false, reason: 'This email address cannot be registered.' };
+        }
+
+        // status is 'valid', 'catch-all', or 'unknown'
+        return { valid: true };
+      }
+    } catch (zbErr) {
+      console.warn('[ZeroBounce Warning] Verification request failed or timed out:', zbErr.message);
+      // Fallback to DNS MX checks if ZeroBounce API encounters network/quota issue
+    }
+  }
+
+  // 3. Fallback: Trusted major email providers
   const trustedDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'protonmail.com', 'aol.com', 'live.com', 'msn.com', 'zoho.com', 'yandex.com', 'gmx.com'];
   if (trustedDomains.includes(domain)) {
     return { valid: true };
   }
 
-  // 3. DNS MX record lookup for custom domains
+  // 4. Fallback: DNS MX record lookup for custom domains
   try {
     const mxRecords = await dns.resolveMx(domain);
     if (mxRecords && mxRecords.length > 0) {
