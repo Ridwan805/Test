@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const moduleSchema = new mongoose.Schema({
+const moduleSubSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true
@@ -32,15 +32,45 @@ const courseSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  courseType: {
+    type: String,
+    enum: ['course', 'bootcamp'],
+    default: 'course'
+  },
+  accessType: {
+    type: String,
+    enum: ['public', 'authenticated'],
+    default: 'authenticated'
+  },
+  price: {
+    type: Number,
+    default: 0
+  },
+  level: {
+    type: String,
+    default: 'Beginner'
+  },
+  thumbnail: {
+    type: String,
+    default: ''
+  },
+  duration: {
+    type: String,
+    default: ''
+  },
   order: {
     type: Number,
     default: 0
   },
+  published: {
+    type: Boolean,
+    default: true
+  },
   is_published: {
     type: Boolean,
-    default: false
+    default: true
   },
-  modules: [moduleSchema]
+  modules: [moduleSubSchema]
 }, {
   timestamps: true,
   toJSON: {
@@ -51,6 +81,16 @@ const courseSchema = new mongoose.Schema({
       return ret;
     }
   }
+});
+
+// Sync published and is_published
+courseSchema.pre('save', function (next) {
+  if (this.isModified('published') && !this.isModified('is_published')) {
+    this.is_published = this.published;
+  } else if (this.isModified('is_published') && !this.isModified('published')) {
+    this.published = this.is_published;
+  }
+  next();
 });
 
 const Course = mongoose.model('Course', courseSchema);

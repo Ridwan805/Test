@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 export default function Signup() {
@@ -11,6 +11,9 @@ export default function Signup() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { signup, error, setError, user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const redirectTarget = location.state?.from || '/';
 
   // Clear previous errors when visiting
   useEffect(() => {
@@ -20,9 +23,9 @@ export default function Signup() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate(redirectTarget, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, redirectTarget]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,7 +45,7 @@ export default function Signup() {
     const success = await signup(firstName, lastName, email, password);
     setIsSubmitting(false);
     if (success) {
-      navigate('/');
+      navigate(redirectTarget, { replace: true });
     }
   };
 

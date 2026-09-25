@@ -6,6 +6,10 @@ import authRoutes from './routes/authRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
 import Course from './models/Course.js';
 import User from './models/User.js';
+import Bootcamp from './models/Bootcamp.js';
+import bootcampRoutes from './routes/bootcampRoutes.js';
+import { seedPythonModule1 } from './seed/pythonModule1.js';
+import { seedRModule1 } from './seed/rModule1.js';
 
 dotenv.config();
 
@@ -79,6 +83,49 @@ try {
   console.error('[Server Startup Seed Warning]:', seedErr.message);
 }
 
+// Auto-seed / Ensure "Intro to Python" bootcamp exists with 5 modules
+try {
+  const pythonBootcamp = await Bootcamp.findOne({ slug: 'intro-to-python' });
+  if (!pythonBootcamp) {
+    console.log('[Server Startup] Initializing "Intro to Python" bootcamp with 5 modules...');
+    await Bootcamp.create({
+      title: 'Intro to Python',
+      slug: 'intro-to-python',
+      tagline: 'A comprehensive, cohort-based foundational bootcamp mastering Python programming.',
+      description: 'An intensive, structured bootcamp covering the core foundations of Python programming with hands-on exercises, code labs, and real-world projects.',
+      duration: '6 Weeks',
+      format: 'Cohort-Based Intensive',
+      level: 'Beginner to Intermediate',
+      order: 1,
+      is_published: true,
+      modules: [
+        { title: 'Module 1', description: 'Curriculum details to be provided', order: 1 },
+        { title: 'Module 2', description: 'Curriculum details to be provided', order: 2 },
+        { title: 'Module 3', description: 'Curriculum details to be provided', order: 3 },
+        { title: 'Module 4', description: 'Curriculum details to be provided', order: 4 },
+        { title: 'Module 5', description: 'Curriculum details to be provided', order: 5 }
+      ]
+    });
+    console.log('[Server Startup] "Intro to Python" bootcamp initialized.');
+  }
+} catch (bootcampErr) {
+  console.error('[Server Startup Bootcamp Warning]:', bootcampErr.message);
+}
+
+// Auto-seed / Verify Python Module 1 with 5 structured lessons from authoritative PDF
+try {
+  await seedPythonModule1();
+} catch (seedModule1Err) {
+  console.error('[Server Startup Python Module 1 Seed Warning]:', seedModule1Err.message);
+}
+
+// Auto-seed / Verify R Module 1 with 5 structured lessons
+try {
+  await seedRModule1();
+} catch (seedRErr) {
+  console.error('[Server Startup R Module 1 Seed Warning]:', seedRErr.message);
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -86,6 +133,7 @@ app.use(express.json());
 // Routes (handling both trailing slash and non-trailing slash for seamless API compatibility)
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/bootcamps', bootcampRoutes);
 
 // Root & API welcome endpoints
 app.get(['/', '/api', '/api/'], (req, res) => {
@@ -95,6 +143,7 @@ app.get(['/', '/api', '/api/'], (req, res) => {
     endpoints: {
       health: '/api/health',
       courses: '/api/courses/',
+      bootcamps: '/api/bootcamps/',
       auth_login: '/api/auth/login/',
       auth_register: '/api/auth/register/',
       auth_me: '/api/auth/me/'

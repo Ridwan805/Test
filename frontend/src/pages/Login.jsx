@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 export default function Login() {
@@ -8,6 +8,9 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, error, setError, user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const redirectTarget = location.state?.from || '/';
 
   // Clear previous errors when visiting
   useEffect(() => {
@@ -17,9 +20,9 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate(redirectTarget, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, redirectTarget]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,7 +34,7 @@ export default function Login() {
     const success = await login(email, password);
     setIsSubmitting(false);
     if (success) {
-      navigate('/');
+      navigate(redirectTarget, { replace: true });
     }
   };
 
