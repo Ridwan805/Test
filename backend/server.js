@@ -10,6 +10,7 @@ import Bootcamp from './models/Bootcamp.js';
 import bootcampRoutes from './routes/bootcampRoutes.js';
 import { seedPythonModule1 } from './seed/pythonModule1.js';
 import { seedPythonModule2 } from './seed/pythonModule2.js';
+import { seedPythonModule3 } from './seed/pythonModule3.js';
 import { seedRModule1 } from './seed/rModule1.js';
 import { seedBootcamps } from './seed/bootcamps.js';
 
@@ -104,6 +105,13 @@ try {
   await seedPythonModule2();
 } catch (seedModule2Err) {
   console.error('[Server Startup Python Module 2 Seed Warning]:', seedModule2Err.message);
+}
+
+// Auto-seed / Verify Python Module 3 with 10 structured lessons & assessments
+try {
+  await seedPythonModule3();
+} catch (seedModule3Err) {
+  console.error('[Server Startup Python Module 3 Seed Warning]:', seedModule3Err.message);
 }
 
 // Auto-seed / Verify R Module 1 with 5 structured lessons

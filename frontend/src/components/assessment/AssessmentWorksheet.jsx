@@ -1,14 +1,28 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../../context/AuthContext';
-import { runPythonCode, gradeHomework, gradeCodingQuiz } from '../../utils/pyodideRunner';
+import {
+  runPythonCode,
+  gradeHomework,
+  gradeCodingQuiz,
+  gradeModule3Homework,
+  gradeModule3Quiz
+} from '../../utils/pyodideRunner';
 
 export default function AssessmentWorksheet({
   courseSlug = 'intro-to-python',
   assessmentType = 'homework', // 'homework' or 'quiz'
+  moduleNumber = 2,
   onSubmitted = () => {}
 }) {
   const { user } = useContext(AuthContext);
   const isAdmin = Boolean(user?.is_staff);
+
+  const targetMod = parseInt(moduleNumber, 10) || 2;
+  const isMod3 = targetMod === 3;
+  const isHomework = assessmentType === 'homework';
+  const notebookPath = isMod3
+    ? (isHomework ? 'module-3-homework.ipynb' : 'module-3-coding-quiz.ipynb')
+    : (isHomework ? 'module-2-homework.ipynb' : 'module-2-coding-quiz.ipynb');
 
   const [assessmentData, setAssessmentData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,10 +38,6 @@ export default function AssessmentWorksheet({
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
-  const [selectedAttemptIndex, setSelectedAttemptIndex] = useState(0);
-
-  const isHomework = assessmentType === 'homework';
-  const notebookPath = isHomework ? 'module-2-homework.ipynb' : 'module-2-coding-quiz.ipynb';
 
   // Fetch assessment metadata and previous attempts
   useEffect(() => {
@@ -38,7 +48,7 @@ export default function AssessmentWorksheet({
       const token = localStorage.getItem('access_token');
 
       try {
-        const res = await fetch(`/api/courses/${courseSlug}/assessments/${assessmentType}`, {
+        const res = await fetch(`/api/courses/${courseSlug}/assessments/${assessmentType}?module=${targetMod}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
 
@@ -54,32 +64,77 @@ export default function AssessmentWorksheet({
           const initialCode = {};
           if (data.assessment?.questions) {
             data.assessment.questions.forEach((q) => {
-              if (isHomework) {
-                if (q.id === 'hw-q1') {
-                  initialCode[q.id] = 'a = 12\nb = 4\n\naddition_result = a + b\nsubtraction_result = a - b\nmultiplication_result = a * b\n\nprint("Addition:", addition_result)\nprint("Subtraction:", subtraction_result)\nprint("Multiplication:", multiplication_result)';
-                } else if (q.id === 'hw-q2') {
-                  initialCode[q.id] = 'length = 10\nbreadth = 5\n\narea = length * breadth\nperimeter = 2 * (length + breadth)\n\nprint("Area:", area)\nprint("Perimeter:", perimeter)';
-                } else if (q.id === 'hw-q3') {
-                  initialCode[q.id] = 'celsius_input = 25\nfahrenheit_result = (9 / 5) * celsius_input + 32\n\nfahrenheit_input = 77\ncelsius_result = (5 / 9) * (fahrenheit_input - 32)\n\nprint("Celsius to Fahrenheit:", fahrenheit_result)\nprint("Fahrenheit to Celsius:", celsius_result)';
-                } else if (q.id === 'hw-q4') {
-                  initialCode[q.id] = 'num_4digit = 3564\n\n# Use floor division (//)\nleftmost_digit = num_4digit // 1000\n\nprint("Leftmost digit:", leftmost_digit)';
-                } else if (q.id === 'hw-q5') {
-                  initialCode[q.id] = 'num_input = 7895\n\n# Use modulus (%)\nrightmost_digit = num_input % 10\n\nprint("Rightmost digit:", rightmost_digit)';
+              if (isMod3) {
+                // Module 3 Homework starters
+                if (isHomework) {
+                  if (q.id === 'hw-a1') {
+                    initialCode[q.id] = 'number = 8\n\n# Check if number is even or odd using % and if/else\nif number % 2 == 0:\n    result = "even"\nelse:\n    result = "odd"\n\nprint("The number is", result)';
+                  } else if (q.id === 'hw-a2') {
+                    initialCode[q.id] = 'text = "racecar"\n\n# Check if text reads the same forwards and backwards\nif text == text[::-1]:\n    is_palindrome = True\nelse:\n    is_palindrome = False\n\nprint("Is palindrome:", is_palindrome)';
+                  } else if (q.id === 'hw-a3') {
+                    initialCode[q.id] = 'temperature = 25\n\n# Classify: >30 hot, 20..30 perfect, 10..<20 chilly, <10 cold\nif temperature > 30:\n    suggestion = "hot"\nelif temperature >= 20:\n    suggestion = "perfect for a walk"\nelif temperature >= 10:\n    suggestion = "chilly"\nelse:\n    suggestion = "cold"\n\nprint("Weather suggestion:", suggestion)';
+                  } else if (q.id === 'hw-a4') {
+                    initialCode[q.id] = 'budget = 35\n\n# Classify: >50 fancy, 30..50 mid-range, 15..<30 casual, 10..<15 fast food, <10 stay home\nif budget > 50:\n    recommendation = "fancy restaurant"\nelif budget >= 30:\n    recommendation = "mid-range restaurant"\nelif budget >= 15:\n    recommendation = "casual dining"\nelif budget >= 10:\n    recommendation = "fast food"\nelse:\n    recommendation = "stay home"\n\nprint("Restaurant recommendation:", recommendation)';
+                  } else if (q.id === 'hw-b1') {
+                    initialCode[q.id] = 'age = 20\nlikes_action = True\n\n# Nested if-else recommendation\nif age >= 18:\n    if likes_action:\n        movie_recommendation = "action blockbuster"\n    else:\n        movie_recommendation = "drama or comedy"\nelse:\n    if likes_action:\n        movie_recommendation = "family action"\n    else:\n        movie_recommendation = "animated movie"\n\nprint("Recommended movie:", movie_recommendation)';
+                  } else if (q.id === 'hw-c1') {
+                    initialCode[q.id] = 'even_sum = 0\ncurrent_num = 1\n\n# Use a while loop to sum all even numbers between 1 and 100\nwhile current_num <= 100:\n    if current_num % 2 == 0:\n        even_sum += current_num\n    current_num += 1\n\nprint("Sum of even numbers 1..100:", even_sum)';
+                  } else if (q.id === 'hw-c2') {
+                    initialCode[q.id] = 'number = 5\ntable_results = []\ncounter = 1\n\n# Use a while loop to generate multiplication table up to 10\nwhile counter <= 10:\n    table_results.append(number * counter)\n    counter += 1\n\nprint("Multiplication table:", table_results)';
+                  } else if (q.id === 'hw-c3') {
+                    initialCode[q.id] = 'car_name = "Tesla"\nn = 3\ncar_list = []\ncount = 0\n\n# Use a while loop to repeat car_name n times\nwhile count < n:\n    car_list.append(car_name)\n    count += 1\n\nprint("Car list:", car_list)';
+                  } else if (q.id === 'hw-c4') {
+                    initialCode[q.id] = 'n = 5\nalternating_sum = 0\n\n# For loop: odd square added, even square subtracted\nfor i in range(1, n + 1):\n    if i % 2 != 0:\n        alternating_sum += i ** 2\n    else:\n        alternating_sum -= i ** 2\n\nprint("Alternating sum of squares:", alternating_sum)';
+                  } else if (q.id === 'hw-c5') {
+                    initialCode[q.id] = 'word = "hello"\nprefixes = []\n\n# Generate all prefixes using a for loop\nfor i in range(1, len(word) + 1):\n    prefixes.append(word[:i])\n\nprint("Prefixes:", prefixes)';
+                  } else if (q.id === 'hw-c6') {
+                    initialCode[q.id] = 'n = 5\nfactorial_result = 1\n\n# Calculate factorial of n using a for loop\nfor i in range(1, n + 1):\n    factorial_result *= i\n\nprint(f"{n}! =", factorial_result)';
+                  }
+                } else {
+                  // Module 3 Quiz starters
+                  if (q.id === 'quiz-q1') {
+                    initialCode[q.id] = 'battery_level = 85\n\n# Determine battery_status using if/elif/else\nif battery_level >= 80:\n    battery_status = "High"\nelif battery_level >= 30:\n    battery_status = "Medium"\nelse:\n    battery_status = "Low"\n\nprint("Battery status:", battery_status)';
+                  } else if (q.id === 'quiz-q2') {
+                    initialCode[q.id] = 'age = 20\nhas_permission = True\n\n# Nested if-else for course access\nif age >= 18:\n    if has_permission:\n        access_result = "Access granted"\n    else:\n        access_result = "Permission required"\nelse:\n    access_result = "Age requirement not met"\n\nprint("Access result:", access_result)';
+                  } else if (q.id === 'quiz-q3') {
+                    initialCode[q.id] = 'n = 4\ncountdown_sum = 0\ncurrent = n\n\n# Use a while loop from n down to 1\nwhile current >= 1:\n    countdown_sum += current\n    current -= 1\n\nprint("Countdown sum:", countdown_sum)';
+                  } else if (q.id === 'quiz-q4') {
+                    initialCode[q.id] = 'n = 10\nmultiple_sum = 0\n\n# Use for and range() to sum multiples of 3 from 1 to n\nfor i in range(1, n + 1):\n    if i % 3 == 0:\n        multiple_sum += i\n\nprint("Sum of multiples of 3:", multiple_sum)';
+                  } else if (q.id === 'quiz-q5') {
+                    initialCode[q.id] = 'processed_sum = 0\n\n# for i in range(1, 21): skip if i % 3 == 0 (continue), break when i == 17\nfor i in range(1, 21):\n    if i == 17:\n        break\n    if i % 3 == 0:\n        continue\n    processed_sum += i\n\nprint("Processed sum:", processed_sum)';
+                  } else if (q.id === 'quiz-q6') {
+                    initialCode[q.id] = 'even_sum_pairs = 0\n\n# Nested loops for i and j from 1 to 4: count (i + j) % 2 == 0\nfor i in range(1, 5):\n    for j in range(1, 5):\n        if (i + j) % 2 == 0:\n            even_sum_pairs += 1\n\nprint("Even sum pairs count:", even_sum_pairs)';
+                  }
                 }
               } else {
-                // Coding Quiz starter templates
-                if (q.id === 'quiz-q1') {
-                  initialCode[q.id] = 'price_text = "29.99"\nquantity_text = "8"\n\nprice = float(price_text)\nquantity = int(quantity_text)\n\nprint("Price:", price, type(price))\nprint("Quantity:", quantity, type(quantity))';
-                } else if (q.id === 'quiz-q2') {
-                  initialCode[q.id] = 'total_cost = price * quantity\nhalf_cost = total_cost / 2\nwhole_units_per_pack = quantity // 3\nremaining_units = quantity % 3\n\nprint("Total Cost:", total_cost)\nprint("Half Cost:", half_cost)\nprint("Whole Units Per Pack:", whole_units_per_pack)\nprint("Remaining Units:", remaining_units)';
-                } else if (q.id === 'quiz-q3') {
-                  initialCode[q.id] = 'first_name = "Ada"\nlast_name = "Lovelace"\n\nfull_name = first_name + " " + last_name\nfull_name_upper = full_name.upper()\nname_length = len(full_name)\n\nprint("Full Name:", full_name)\nprint("Uppercase:", full_name_upper)\nprint("Length:", name_length)';
-                } else if (q.id === 'quiz-q4') {
-                  initialCode[q.id] = 'word = "Algorithms"\n\nfirst_char = word[0]\nlast_char = word[-1]\nfirst_three = word[:3]\nreversed_word = word[::-1]\n\nprint("First:", first_char)\nprint("Last:", last_char)\nprint("First Three:", first_three)\nprint("Reversed:", reversed_word)';
-                } else if (q.id === 'quiz-q5') {
-                  initialCode[q.id] = 'same_value = (quantity == name_length)\nquantity_larger = (quantity > name_length)\ndifferent_value = (quantity != name_length)\n\nprint("Same Value:", same_value)\nprint("Quantity Larger:", quantity_larger)\nprint("Different Value:", different_value)';
-                } else if (q.id === 'quiz-q6') {
-                  initialCode[q.id] = 'logic_and = (quantity > 5 and name_length > 5)\nlogic_or = (quantity < 10 or name_length < 10)\nlogic_not = not (quantity == name_length)\n\nprint("Logic AND:", logic_and)\nprint("Logic OR:", logic_or)\nprint("Logic NOT:", logic_not)';
+                // Module 2 Homework starters
+                if (isHomework) {
+                  if (q.id === 'hw-q1') {
+                    initialCode[q.id] = 'a = 12\nb = 4\n\naddition_result = a + b\nsubtraction_result = a - b\nmultiplication_result = a * b\n\nprint("Addition:", addition_result)\nprint("Subtraction:", subtraction_result)\nprint("Multiplication:", multiplication_result)';
+                  } else if (q.id === 'hw-q2') {
+                    initialCode[q.id] = 'length = 10\nbreadth = 5\n\narea = length * breadth\nperimeter = 2 * (length + breadth)\n\nprint("Area:", area)\nprint("Perimeter:", perimeter)';
+                  } else if (q.id === 'hw-q3') {
+                    initialCode[q.id] = 'celsius_input = 25\nfahrenheit_result = (9 / 5) * celsius_input + 32\n\nfahrenheit_input = 77\ncelsius_result = (5 / 9) * (fahrenheit_input - 32)\n\nprint("Celsius to Fahrenheit:", fahrenheit_result)\nprint("Fahrenheit to Celsius:", celsius_result)';
+                  } else if (q.id === 'hw-q4') {
+                    initialCode[q.id] = 'num_4digit = 3564\n\n# Use floor division (//)\nleftmost_digit = num_4digit // 1000\n\nprint("Leftmost digit:", leftmost_digit)';
+                  } else if (q.id === 'hw-q5') {
+                    initialCode[q.id] = 'num_input = 7895\n\n# Use modulus (%)\nrightmost_digit = num_input % 10\n\nprint("Rightmost digit:", rightmost_digit)';
+                  }
+                } else {
+                  // Module 2 Coding Quiz starter templates
+                  if (q.id === 'quiz-q1') {
+                    initialCode[q.id] = 'price_text = "29.99"\nquantity_text = "8"\n\nprice = float(price_text)\nquantity = int(quantity_text)\n\nprint("Price:", price, type(price))\nprint("Quantity:", quantity, type(quantity))';
+                  } else if (q.id === 'quiz-q2') {
+                    initialCode[q.id] = 'total_cost = price * quantity\nhalf_cost = total_cost / 2\nwhole_units_per_pack = quantity // 3\nremaining_units = quantity % 3\n\nprint("Total Cost:", total_cost)\nprint("Half Cost:", half_cost)\nprint("Whole Units Per Pack:", whole_units_per_pack)\nprint("Remaining Units:", remaining_units)';
+                  } else if (q.id === 'quiz-q3') {
+                    initialCode[q.id] = 'first_name = "Ada"\nlast_name = "Lovelace"\n\nfull_name = first_name + " " + last_name\nfull_name_upper = full_name.upper()\nname_length = len(full_name)\n\nprint("Full Name:", full_name)\nprint("Uppercase:", full_name_upper)\nprint("Length:", name_length)';
+                  } else if (q.id === 'quiz-q4') {
+                    initialCode[q.id] = 'word = "Algorithms"\n\nfirst_char = word[0]\nlast_char = word[-1]\nfirst_three = word[:3]\nreversed_word = word[::-1]\n\nprint("First:", first_char)\nprint("Last:", last_char)\nprint("First Three:", first_three)\nprint("Reversed:", reversed_word)';
+                  } else if (q.id === 'quiz-q5') {
+                    initialCode[q.id] = 'same_value = (quantity == name_length)\nquantity_larger = (quantity > name_length)\ndifferent_value = (quantity != name_length)\n\nprint("Same Value:", same_value)\nprint("Quantity Larger:", quantity_larger)\nprint("Different Value:", different_value)';
+                  } else if (q.id === 'quiz-q6') {
+                    initialCode[q.id] = 'logic_and = (quantity > 5 and name_length > 5)\nlogic_or = (quantity < 10 or name_length < 10)\nlogic_not = not (quantity == name_length)\n\nprint("Logic AND:", logic_and)\nprint("Logic OR:", logic_or)\nprint("Logic NOT:", logic_not)';
+                  }
                 }
               }
             });
@@ -97,7 +152,7 @@ export default function AssessmentWorksheet({
     return () => {
       isMounted = false;
     };
-  }, [courseSlug, assessmentType, isHomework]);
+  }, [courseSlug, assessmentType, isHomework, targetMod, isMod3]);
 
   // Handle running a single question's code
   const handleRunQuestion = async (qId) => {
@@ -118,9 +173,16 @@ export default function AssessmentWorksheet({
 
     try {
       // 1. Run automated grading in Pyodide
-      const questionResults = isHomework
-        ? await gradeHomework(studentCode)
-        : await gradeCodingQuiz(studentCode);
+      let questionResults;
+      if (isMod3) {
+        questionResults = isHomework
+          ? await gradeModule3Homework(studentCode)
+          : await gradeModule3Quiz(studentCode);
+      } else {
+        questionResults = isHomework
+          ? await gradeHomework(studentCode)
+          : await gradeCodingQuiz(studentCode);
+      }
 
       // 2. Submit to backend API
       const res = await fetch(`/api/courses/${courseSlug}/assessments/${assessmentType}/submit`, {
@@ -131,7 +193,8 @@ export default function AssessmentWorksheet({
         },
         body: JSON.stringify({
           questionResults,
-          submittedCode: studentCode
+          submittedCode: studentCode,
+          moduleNumber: targetMod
         })
       });
 
@@ -162,7 +225,6 @@ export default function AssessmentWorksheet({
       alert(`Submission error: ${err.message}`);
     } finally {
       setIsSubmitting(false);
-      // Scroll to top of results
       window.scrollTo({ top: 300, behavior: 'smooth' });
     }
   };
@@ -234,14 +296,14 @@ export default function AssessmentWorksheet({
         </div>
       </div>
 
-      {/* Submission Results Panel (Rendered after submit or if viewing previous attempt) */}
+      {/* Submission Results Panel */}
       {submissionResult && (
         <div className="submission-result-modal">
           <div className="result-card-header">
             <div>
               <span className="result-pill">ASSESSMENT RESULTS</span>
               <h2 className="result-title">
-                {isHomework ? 'Module 2 Homework Result' : 'Module 2 Coding Quiz Result'}
+                {isHomework ? `Module ${targetMod} Homework Result` : `Module ${targetMod} Coding Quiz Result`}
               </h2>
             </div>
             <div className="result-score-box">
@@ -254,11 +316,11 @@ export default function AssessmentWorksheet({
             </div>
           </div>
 
-          {/* Module 2 Combined Progression Breakdown */}
+          {/* Module Combined Progression Breakdown */}
           {submissionResult.moduleGradeSummary && (
             <div className="module-grade-banner">
               <div className="banner-left">
-                <span className="banner-pre">MODULE 2 PROGRESSION GRADE</span>
+                <span className="banner-pre">MODULE {targetMod} PROGRESSION GRADE</span>
                 <h3 className="banner-grade">
                   Combined Grade: <strong>{submissionResult.moduleGradeSummary.moduleGrade}%</strong>
                 </h3>
@@ -271,8 +333,8 @@ export default function AssessmentWorksheet({
                   <div className="status-pass-badge">
                     <span className="pass-icon">✓</span>
                     <div>
-                      <strong>PASSED MODULE 2 (≥ 80%)</strong>
-                      <p>Module 3 is now unlocked!</p>
+                      <strong>PASSED MODULE {targetMod} (≥ 80%)</strong>
+                      <p>Module {targetMod + 1} is now unlocked!</p>
                     </div>
                   </div>
                 ) : (
@@ -280,7 +342,7 @@ export default function AssessmentWorksheet({
                     <span className="lock-icon">🔒</span>
                     <div>
                       <strong>NOT YET PASSED (Need 80%)</strong>
-                      <p>Module 3 remains locked. Retry to improve your score.</p>
+                      <p>Module {targetMod + 1} remains locked. Retry to improve your score.</p>
                     </div>
                   </div>
                 )}

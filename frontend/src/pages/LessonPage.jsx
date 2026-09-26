@@ -131,12 +131,27 @@ export default function LessonPage() {
   }
 
   const { course, module: currentModule, lesson, navigation, sidebarLessons = [] } = lessonData;
-  const isModule2 = currentModule.moduleNumber === 2;
-  const isHomeworkLesson = lessonSlug === 'module-2-homework' || lessonSlug === 'homework';
-  const isQuizLesson = lessonSlug === 'module-2-coding-quiz' || lessonSlug === 'coding-quiz';
+  const currentModNum = currentModule?.moduleNumber || 1;
+  const isModule2 = currentModNum === 2;
+  const isModule3 = currentModNum === 3;
+  const isLabModule = isModule2 || isModule3;
+  const isHomeworkLesson =
+    lessonSlug === `module-${currentModNum}-homework` ||
+    lessonSlug === 'module-2-homework' ||
+    lessonSlug === 'module-3-homework' ||
+    lessonSlug === 'homework';
+  const isQuizLesson =
+    lessonSlug === `module-${currentModNum}-coding-quiz` ||
+    lessonSlug === 'module-2-coding-quiz' ||
+    lessonSlug === 'module-3-coding-quiz' ||
+    lessonSlug === 'coding-quiz';
 
   const handleResetPractice = async () => {
-    if (window.confirm("Are you sure you want to reset your Module 2 Practice Notebook? This will restore a fresh copy from the master template.")) {
+    if (
+      window.confirm(
+        `Are you sure you want to reset your Module ${currentModNum} Practice Notebook? This will restore a fresh copy from the master template.`
+      )
+    ) {
       try {
         if (window.indexedDB && window.indexedDB.databases) {
           const dbs = await window.indexedDB.databases();
@@ -147,7 +162,7 @@ export default function LessonPage() {
                 const db = e.target.result;
                 if (db.objectStoreNames.contains('files')) {
                   const tx = db.transaction('files', 'readwrite');
-                  tx.objectStore('files').delete('module-2-practice.ipynb');
+                  tx.objectStore('files').delete(`module-${currentModNum}-practice.ipynb`);
                 }
               };
             }
@@ -215,7 +230,7 @@ export default function LessonPage() {
                       </Link>
                     </li>
 
-                    {/* Insert Official Homework link right after Lesson 8 Arithmetic Operators */}
+                    {/* Module 2 Assessment Links in Sidebar */}
                     {isModule2 && item.lessonNumber === 8 && (
                       <li className="sidebar-assessment-divider">
                         <Link
@@ -231,8 +246,6 @@ export default function LessonPage() {
                         </Link>
                       </li>
                     )}
-
-                    {/* Insert Final Coding Quiz link right after Checkpoint (Lesson 10) */}
                     {isModule2 && item.lessonNumber === 10 && (
                       <li className="sidebar-assessment-divider">
                         <Link
@@ -244,6 +257,38 @@ export default function LessonPage() {
                           <div className="item-text-wrapper">
                             <span className="item-lesson-num">GRADED FINAL QUIZ (60%)</span>
                             <span className="item-title">Module 2 Coding Quiz (20 Marks)</span>
+                          </div>
+                        </Link>
+                      </li>
+                    )}
+
+                    {/* Module 3 Assessment Links in Sidebar */}
+                    {isModule3 && item.lessonNumber === 8 && (
+                      <li className="sidebar-assessment-divider">
+                        <Link
+                          to={`/learn/${courseSlug}/module/3/lesson/module-3-homework`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-3-homework' ? 'active' : ''}`}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <span className="assessment-badge-icon">⭐</span>
+                          <div className="item-text-wrapper">
+                            <span className="item-lesson-num">GRADED HOMEWORK (40%)</span>
+                            <span className="item-title">Module 3 Homework (40 Marks)</span>
+                          </div>
+                        </Link>
+                      </li>
+                    )}
+                    {isModule3 && item.lessonNumber === 10 && (
+                      <li className="sidebar-assessment-divider">
+                        <Link
+                          to={`/learn/${courseSlug}/module/3/lesson/module-3-coding-quiz`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-3-coding-quiz' ? 'active' : ''}`}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <span className="assessment-badge-icon">🏆</span>
+                          <div className="item-text-wrapper">
+                            <span className="item-lesson-num">GRADED FINAL QUIZ (60%)</span>
+                            <span className="item-title">Module 3 Coding Quiz (20 Marks)</span>
                           </div>
                         </Link>
                       </li>
@@ -272,16 +317,16 @@ export default function LessonPage() {
             <span>Module {currentModule.moduleNumber}</span>
           </nav>
 
-          {/* Module 2 Practice & Assessment Quick Actions Banner */}
-          {isModule2 && (
+          {/* Module 2 & 3 Practice & Assessment Quick Actions Banner */}
+          {isLabModule && (
             <div className="module2-quick-banner">
               <div className="quick-banner-left">
-                <span className="quick-pill">MODULE 2 LAB TOOLS</span>
+                <span className="quick-pill">MODULE 0{currentModNum} LAB TOOLS</span>
                 <span className="quick-title">Practice Notebook (Ungraded) & Assessments</span>
               </div>
               <div className="quick-banner-actions">
                 <a
-                  href={`/lite/notebooks/index.html?path=module-2-practice.ipynb${user?.is_staff ? '&admin=1' : '&admin=0'}`}
+                  href={`/lite/notebooks/index.html?path=module-${currentModNum}-practice.ipynb${user?.is_staff ? '&admin=1' : '&admin=0'}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-secondary btn-sm"
@@ -306,12 +351,14 @@ export default function LessonPage() {
             <AssessmentWorksheet
               courseSlug={courseSlug}
               assessmentType="homework"
+              moduleNumber={currentModNum}
               onSubmitted={() => {}}
             />
           ) : isQuizLesson ? (
             <AssessmentWorksheet
               courseSlug={courseSlug}
               assessmentType="quiz"
+              moduleNumber={currentModNum}
               onSubmitted={() => {}}
             />
           ) : (

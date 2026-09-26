@@ -111,8 +111,9 @@ router.get('/:slug/modules', protect, async (req, res) => {
       progressMap.set(String(p.lessonId), p.completed);
     });
 
-    // Fetch Module 2 grade summary for progression gating
+    // Fetch Module 2 and Module 3 grade summaries for progression gating
     const mod2GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 2);
+    const mod3GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 3);
 
     const curriculum = modules.map((m) => {
       const mObj = m.toJSON();
@@ -131,11 +132,15 @@ router.get('/:slug/modules', protect, async (req, res) => {
         mObj.isLocked = false;
         mObj.hasGradeRequirement = true;
         mObj.gradeSummary = mod2GradeSummary;
-      } else if (m.moduleNumber >= 3) {
+      } else if (m.moduleNumber === 3) {
         mObj.hasGradeRequirement = true;
-        // Non-admins locked if Module 2 grade < 80%
         mObj.isLocked = !mod2GradeSummary.passed && !req.user.is_staff;
         mObj.lockReason = 'Complete Module 2 with at least 80% to unlock.';
+        mObj.gradeSummary = mod3GradeSummary;
+      } else if (m.moduleNumber >= 4) {
+        mObj.hasGradeRequirement = true;
+        mObj.isLocked = (!mod2GradeSummary.passed || !mod3GradeSummary.passed) && !req.user.is_staff;
+        mObj.lockReason = 'Complete Module 3 with at least 80% to unlock.';
       }
       return mObj;
     });
@@ -155,6 +160,7 @@ router.get('/:slug/modules', protect, async (req, res) => {
       },
       curriculum,
       module2GradeSummary: mod2GradeSummary,
+      module3GradeSummary: mod3GradeSummary,
       totalLessons: lessons.length,
       completedLessons: completedCount,
       progressPercentage
@@ -181,8 +187,9 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
       return res.status(404).json({ detail: 'Course not found' });
     }
 
-    // Backend Module Lock: Module 3 requires Module 2 grade >= 80%
-    if (moduleNumber >= 3 && !req.user.is_staff) {
+    // Backend Module Lock:
+    // Module 3 requires Module 2 grade >= 80%
+    if (moduleNumber === 3 && !req.user.is_staff) {
       const mod2Grade = await getModuleGradeSummary(req.user._id, course._id, 2);
       if (!mod2Grade.passed) {
         return res.status(403).json({
@@ -193,6 +200,22 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
           requiredGrade: 80,
           homeworkPercentage: mod2Grade.homework.bestPercentage,
           quizPercentage: mod2Grade.quiz.bestPercentage
+        });
+      }
+    }
+
+    // Module 4+ requires Module 3 grade >= 80%
+    if (moduleNumber >= 4 && !req.user.is_staff) {
+      const mod3Grade = await getModuleGradeSummary(req.user._id, course._id, 3);
+      if (!mod3Grade.passed) {
+        return res.status(403).json({
+          detail: 'Module 4 is locked. Complete Module 3 with at least 80% to continue.',
+          locked: true,
+          moduleNumber,
+          module3Grade: mod3Grade.moduleGrade,
+          requiredGrade: 80,
+          homeworkPercentage: mod3Grade.homework.bestPercentage,
+          quizPercentage: mod3Grade.quiz.bestPercentage
         });
       }
     }
@@ -223,6 +246,7 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
     }));
 
     const mod2GradeSummary = moduleNumber === 2 ? await getModuleGradeSummary(req.user._id, course._id, 2) : null;
+    const mod3GradeSummary = moduleNumber === 3 ? await getModuleGradeSummary(req.user._id, course._id, 3) : null;
 
     res.json({
       course: {
@@ -234,7 +258,8 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
       },
       module: moduleDoc,
       lessons: lessonsWithProgress,
-      module2GradeSummary: mod2GradeSummary
+      module2GradeSummary: mod2GradeSummary,
+      module3GradeSummary: mod3GradeSummary
     });
   } catch (error) {
     console.error('Fetch Module Error:', error.message);
@@ -305,8 +330,9 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
 
     const moduleDoc = await Module.findById(lesson.moduleId);
 
-    // Backend Lesson Lock: Module 3 lessons require Module 2 grade >= 80%
-    if (moduleDoc && moduleDoc.moduleNumber >= 3 && !req.user.is_staff) {
+    // Backend Lesson Lock:
+    // Module 3 lessons require Module 2 grade >= 80%
+    if (moduleDoc && moduleDoc.moduleNumber === 3 && !req.user.is_staff) {
       const mod2Grade = await getModuleGradeSummary(req.user._id, course._id, 2);
       if (!mod2Grade.passed) {
         return res.status(403).json({
@@ -317,6 +343,22 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
           requiredGrade: 80,
           homeworkPercentage: mod2Grade.homework.bestPercentage,
           quizPercentage: mod2Grade.quiz.bestPercentage
+        });
+      }
+    }
+
+    // Module 4+ lessons require Module 3 grade >= 80%
+    if (moduleDoc && moduleDoc.moduleNumber >= 4 && !req.user.is_staff) {
+      const mod3Grade = await getModuleGradeSummary(req.user._id, course._id, 3);
+      if (!mod3Grade.passed) {
+        return res.status(403).json({
+          detail: 'This lesson is locked. Complete Module 3 with at least 80% to continue.',
+          locked: true,
+          moduleNumber: moduleDoc.moduleNumber,
+          module3Grade: mod3Grade.moduleGrade,
+          requiredGrade: 80,
+          homeworkPercentage: mod3Grade.homework.bestPercentage,
+          quizPercentage: mod3Grade.quiz.bestPercentage
         });
       }
     }
@@ -390,6 +432,27 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
         completed: false,
         isAssessment: true,
         isCurrent: lessonSlug === 'module-2-coding-quiz'
+      });
+    } else if (moduleDoc && moduleDoc.moduleNumber === 3) {
+      sidebarLessons.push({
+        id: 'module-3-hw-sidebar',
+        title: 'Module 3 Homework (Graded)',
+        slug: 'module-3-homework',
+        lessonNumber: 11,
+        estimatedMinutes: 30,
+        completed: false,
+        isAssessment: true,
+        isCurrent: lessonSlug === 'module-3-homework'
+      });
+      sidebarLessons.push({
+        id: 'module-3-quiz-sidebar',
+        title: 'Module 3 Coding Quiz (Graded)',
+        slug: 'module-3-coding-quiz',
+        lessonNumber: 12,
+        estimatedMinutes: 30,
+        completed: false,
+        isAssessment: true,
+        isCurrent: lessonSlug === 'module-3-coding-quiz'
       });
     }
 

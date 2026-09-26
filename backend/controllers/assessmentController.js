@@ -10,14 +10,16 @@ const cleanSlug = (slug) => (slug && slug.endsWith('/') ? slug.slice(0, -1) : sl
  * Calculates current grade summary and progression status for a given module
  */
 export async function getModuleGradeSummary(userId, courseId, moduleNumber = 2) {
-  const moduleDoc = await Module.findOne({ courseId, moduleNumber });
+  const modNum = parseInt(moduleNumber, 10) || 2;
+  const moduleDoc = await Module.findOne({ courseId, moduleNumber: modNum });
   if (!moduleDoc) {
     return {
-      moduleNumber,
+      moduleNumber: modNum,
       moduleGrade: 0,
       passed: false,
       requiredGrade: 80,
       module3Unlocked: false,
+      module4Unlocked: false,
       homework: { maxPoints: 40, bestScore: 0, bestPercentage: 0, attemptsCount: 0, attempts: [] },
       quiz: { maxPoints: 20, bestScore: 0, bestPercentage: 0, attemptsCount: 0, attempts: [] }
     };
@@ -67,14 +69,15 @@ export async function getModuleGradeSummary(userId, courseId, moduleNumber = 2) 
 
   return {
     moduleId: moduleDoc._id,
-    moduleNumber,
+    moduleNumber: modNum,
     moduleGrade,
     passed,
     requiredGrade: 80,
-    module3Unlocked: passed,
+    module3Unlocked: modNum === 2 ? passed : true,
+    module4Unlocked: modNum === 3 ? passed : false,
     homework: {
       assessmentId: hwAssessment?._id,
-      title: hwAssessment?.title || 'Module 2 Official Graded Homework',
+      title: hwAssessment?.title || `Module ${modNum} Official Graded Homework`,
       maxPoints: hwAssessment?.maxPoints || 40,
       weight: hwWeight,
       bestScore: bestHwScore,
@@ -84,7 +87,7 @@ export async function getModuleGradeSummary(userId, courseId, moduleNumber = 2) 
     },
     quiz: {
       assessmentId: quizAssessment?._id,
-      title: quizAssessment?.title || 'Module 2 Official Final Coding Quiz',
+      title: quizAssessment?.title || `Module ${modNum} Official Final Coding Quiz`,
       maxPoints: quizAssessment?.maxPoints || 20,
       weight: quizWeight,
       bestScore: bestQuizScore,
@@ -122,11 +125,13 @@ export async function getModuleGradeHandler(req, res) {
 
 /**
  * Controller: GET /api/courses/:slug/assessments/:type
+ * Supports type = 'homework' | 'quiz' | slug (e.g. 'module-3-homework')
+ * Query params: ?module=3 or ?moduleNumber=3
  */
 export async function getAssessmentDetailHandler(req, res) {
   try {
     const courseSlug = cleanSlug(req.params.slug);
-    const type = req.params.type.toLowerCase(); // 'homework' or 'quiz'
+    const rawType = req.params.type.toLowerCase();
 
     const course = await Course.findOne({
       slug: courseSlug,
@@ -137,14 +142,52 @@ export async function getAssessmentDetailHandler(req, res) {
       return res.status(404).json({ detail: 'Course not found' });
     }
 
-    const assessment = await Assessment.findOne({
-      courseId: course._id,
-      type,
-      published: true
-    });
+    // Determine target moduleNumber and assessment type
+    let targetModuleNumber = 2; // default
+    let assessmentType = 'homework';
+
+    if (rawType.includes('module-3') || req.query.module === '3' || req.query.moduleNumber === '3') {
+      targetModuleNumber = 3;
+    } else if (rawType.includes('module-2') || req.query.module === '2' || req.query.moduleNumber === '2') {
+      targetModuleNumber = 2;
+    } else if (req.query.module) {
+      targetModuleNumber = parseInt(req.query.module, 10);
+    } else if (req.query.moduleNumber) {
+      targetModuleNumber = parseInt(req.query.moduleNumber, 10);
+    }
+
+    if (rawType.includes('quiz')) {
+      assessmentType = 'quiz';
+    } else if (rawType.includes('homework')) {
+      assessmentType = 'homework';
+    } else {
+      assessmentType = rawType;
+    }
+
+    // Find target module
+    const moduleDoc = await Module.findOne({ courseId: course._id, moduleNumber: targetModuleNumber });
+    let assessment = null;
+
+    if (moduleDoc) {
+      assessment = await Assessment.findOne({
+        courseId: course._id,
+        moduleId: moduleDoc._id,
+        type: assessmentType,
+        published: true
+      });
+    }
+
+    // Fallback: try by slug or direct type
+    if (!assessment) {
+      assessment = await Assessment.findOne({
+        courseId: course._id,
+        $or: [{ slug: rawType }, { type: assessmentType }],
+        published: true
+      });
+    }
 
     if (!assessment) {
-      return res.status(404).json({ detail: `Assessment of type '${type}' not found` });
+      return res.status(404).json({ detail: `Assessment '${rawType}' not found` });
     }
 
     // Fetch user's previous attempts for this assessment
@@ -175,8 +218,8 @@ export async function getAssessmentDetailHandler(req, res) {
 export async function submitAssessmentAttemptHandler(req, res) {
   try {
     const courseSlug = cleanSlug(req.params.slug);
-    const type = req.params.type.toLowerCase(); // 'homework' or 'quiz'
-    const { questionResults = [], submittedCode = {} } = req.body;
+    const rawType = req.params.type.toLowerCase();
+    const { questionResults = [], submittedCode = {}, moduleNumber } = req.body;
 
     const course = await Course.findOne({
       slug: courseSlug,
@@ -187,14 +230,47 @@ export async function submitAssessmentAttemptHandler(req, res) {
       return res.status(404).json({ detail: 'Course not found' });
     }
 
-    const assessment = await Assessment.findOne({
-      courseId: course._id,
-      type,
-      published: true
-    });
+    // Determine target moduleNumber and assessment type
+    let targetModuleNumber = 2;
+    if (moduleNumber) {
+      targetModuleNumber = parseInt(moduleNumber, 10);
+    } else if (rawType.includes('module-3') || req.query.module === '3' || req.query.moduleNumber === '3') {
+      targetModuleNumber = 3;
+    } else if (rawType.includes('module-2') || req.query.module === '2' || req.query.moduleNumber === '2') {
+      targetModuleNumber = 2;
+    }
+
+    let assessmentType = 'homework';
+    if (rawType.includes('quiz')) {
+      assessmentType = 'quiz';
+    } else if (rawType.includes('homework')) {
+      assessmentType = 'homework';
+    } else {
+      assessmentType = rawType;
+    }
+
+    const moduleDoc = await Module.findOne({ courseId: course._id, moduleNumber: targetModuleNumber });
+    let assessment = null;
+
+    if (moduleDoc) {
+      assessment = await Assessment.findOne({
+        courseId: course._id,
+        moduleId: moduleDoc._id,
+        type: assessmentType,
+        published: true
+      });
+    }
 
     if (!assessment) {
-      return res.status(404).json({ detail: `Assessment of type '${type}' not found` });
+      assessment = await Assessment.findOne({
+        courseId: course._id,
+        $or: [{ slug: rawType }, { type: assessmentType }],
+        published: true
+      });
+    }
+
+    if (!assessment) {
+      return res.status(404).json({ detail: `Assessment '${rawType}' not found` });
     }
 
     // Determine next attempt number
@@ -221,7 +297,7 @@ export async function submitAssessmentAttemptHandler(req, res) {
       };
     });
 
-    const maxPoints = assessment.maxPoints || (type === 'homework' ? 40 : 20);
+    const maxPoints = assessment.maxPoints || (assessmentType === 'homework' ? 40 : 20);
     const clampedTotal = Math.min(Math.max(totalEarned, 0), maxPoints);
     const percentage = Math.round((clampedTotal / maxPoints) * 1000) / 10; // 1 decimal place
 
@@ -231,7 +307,7 @@ export async function submitAssessmentAttemptHandler(req, res) {
       courseId: course._id,
       moduleId: assessment.moduleId,
       assessmentId: assessment._id,
-      assessmentType: type,
+      assessmentType: assessmentType,
       attemptNumber,
       earnedPoints: clampedTotal,
       maxPoints,
@@ -241,8 +317,10 @@ export async function submitAssessmentAttemptHandler(req, res) {
       submittedAt: new Date()
     });
 
-    // Recompute overall Module 2 Grade
-    const moduleGradeSummary = await getModuleGradeSummary(req.user._id, course._id, 2);
+    // Recompute overall Grade for this module
+    const associatedModule = await Module.findById(assessment.moduleId);
+    const associatedModNum = associatedModule ? associatedModule.moduleNumber : targetModuleNumber;
+    const moduleGradeSummary = await getModuleGradeSummary(req.user._id, course._id, associatedModNum);
 
     res.status(201).json({
       message: 'Assessment attempt submitted and graded successfully',

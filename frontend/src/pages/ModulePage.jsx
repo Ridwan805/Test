@@ -71,7 +71,11 @@ export default function ModulePage() {
   }, [courseSlug, moduleNumber, navigate]);
 
   const handleResetPractice = async () => {
-    if (window.confirm("Are you sure you want to reset your Module 2 Practice Notebook? This will restore a fresh copy from the clean master template.")) {
+    if (
+      window.confirm(
+        `Are you sure you want to reset your Module ${modNum} Practice Notebook? This will restore a fresh copy from the clean master template.`
+      )
+    ) {
       try {
         if (window.indexedDB && window.indexedDB.databases) {
           const dbs = await window.indexedDB.databases();
@@ -82,7 +86,7 @@ export default function ModulePage() {
                 const db = e.target.result;
                 if (db.objectStoreNames.contains('files')) {
                   const tx = db.transaction('files', 'readwrite');
-                  tx.objectStore('files').delete('module-2-practice.ipynb');
+                  tx.objectStore('files').delete(`module-${modNum}-practice.ipynb`);
                 }
               };
             }
@@ -106,6 +110,13 @@ export default function ModulePage() {
   }
 
   if (isLocked) {
+    const requiredMod = modNum > 1 ? modNum - 1 : 2;
+    const prevGrade =
+      lockDetails?.[`module${requiredMod}Grade`] ||
+      lockDetails?.module3Grade ||
+      lockDetails?.module2Grade ||
+      0;
+
     return (
       <div className="container" style={{ padding: '4rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
         <div className="dashboard-breadcrumb" style={{ marginBottom: '1.5rem' }}>
@@ -122,24 +133,24 @@ export default function ModulePage() {
             Module {moduleNumber} is Locked
           </h2>
           <p style={{ color: '#475569', fontSize: '1.05rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
-            {lockDetails?.detail || 'To unlock this module, you must achieve a combined score of at least 80% in Module 2 (Homework + Coding Quiz).'}
+            {lockDetails?.detail || `To unlock this module, you must achieve a combined score of at least 80% in Module ${requiredMod} (Homework + Coding Quiz).`}
           </p>
 
           <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '1rem', marginBottom: '2rem', display: 'inline-block' }}>
             <span style={{ fontWeight: 700, color: '#92400E' }}>
-              Your Current Module 2 Grade: {lockDetails?.module2Grade || 0}% / Required: 80%
+              Your Current Module {requiredMod} Grade: {prevGrade}% / Required: 80%
             </span>
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link
-              to={`/learn/${courseSlug}/module/2/lesson/module-2-homework`}
+              to={`/learn/${courseSlug}/module/${requiredMod}/lesson/module-${requiredMod}-homework`}
               className="btn btn-primary"
             >
               Improve Homework Score →
             </Link>
             <Link
-              to={`/learn/${courseSlug}/module/2/lesson/module-2-coding-quiz`}
+              to={`/learn/${courseSlug}/module/${requiredMod}/lesson/module-${requiredMod}-coding-quiz`}
               className="btn btn-secondary"
             >
               Improve Quiz Score →
@@ -170,13 +181,16 @@ export default function ModulePage() {
     );
   }
 
-  const { course, module: modDoc, lessons = [], module2GradeSummary } = moduleData;
+  const { course, module: modDoc, lessons = [], module2GradeSummary, module3GradeSummary } = moduleData;
 
   const completedCount = lessons.filter((l) => l.completed).length;
   const totalCount = lessons.length;
   const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const isMod1 = modNum === 1;
   const isMod2 = modNum === 2;
+  const isMod3 = modNum === 3;
+  const isGradedModule = isMod2 || isMod3;
+  const activeGradeSummary = isMod2 ? module2GradeSummary : isMod3 ? module3GradeSummary : null;
 
   // Determine first incomplete lesson to start learning
   const nextIncompleteLesson = lessons.find((l) => !l.completed);
@@ -205,7 +219,7 @@ export default function ModulePage() {
             {isMod1 && (
               <span className="pill-badge pill-intro">INTRODUCTORY &bull; NO PASS MARK</span>
             )}
-            {isMod2 && (
+            {isGradedModule && (
               <span className="pill-badge pill-graded">GRADED &bull; 80% COMBINED GRADE REQUIRED</span>
             )}
             {completedCount === totalCount && totalCount > 0 ? (
@@ -254,15 +268,15 @@ export default function ModulePage() {
         </div>
       </div>
 
-      {/* If Module 2: Assessment & Grade Performance Section */}
-      {isMod2 && module2GradeSummary && (
+      {/* If Graded Module (Module 2 or 3): Assessment & Grade Performance Section */}
+      {isGradedModule && activeGradeSummary && (
         <section style={{ marginBottom: '2.5rem' }}>
           <div className="module-assessment-overview-card">
             <div className="overview-header-row">
               <div className="overview-title-group">
-                <span className="overview-pre">MODULE 2 PERFORMANCE & PROGRESSION</span>
+                <span className="overview-pre">MODULE 0{modNum} PERFORMANCE & PROGRESSION</span>
                 <h3 className="overview-heading">
-                  Combined Module Grade: <strong>{module2GradeSummary.moduleGrade}%</strong>
+                  Combined Module Grade: <strong>{activeGradeSummary.moduleGrade}%</strong>
                 </h3>
                 <span className="overview-sub">
                   Passing Requirement: <strong>80.0%</strong> (Homework: 40% + Coding Quiz: 60%)
@@ -270,12 +284,12 @@ export default function ModulePage() {
               </div>
 
               <div className="overview-result-badge">
-                {module2GradeSummary.passed ? (
+                {activeGradeSummary.passed ? (
                   <div className="badge-pass-pill">
                     <span className="badge-check">✓</span>
                     <div>
-                      <strong>PASSED MODULE 2</strong>
-                      <p>Module 3 is Unlocked</p>
+                      <strong>PASSED MODULE 0{modNum}</strong>
+                      <p>Module 0{modNum + 1} is Unlocked</p>
                     </div>
                   </div>
                 ) : (
@@ -283,7 +297,7 @@ export default function ModulePage() {
                     <span className="badge-lock">🔒</span>
                     <div>
                       <strong>NOT YET PASSED (Need 80%)</strong>
-                      <p>Module 3 Remains Locked</p>
+                      <p>Module 0{modNum + 1} Remains Locked</p>
                     </div>
                   </div>
                 )}
@@ -297,28 +311,30 @@ export default function ModulePage() {
                 <div className="stat-card-top">
                   <span className="stat-type">GRADED HOMEWORK (40%)</span>
                   <span className="stat-marks">
-                    Best: <strong>{module2GradeSummary.homework?.bestScore || 0} / 40</strong>
+                    Best: <strong>{activeGradeSummary.homework?.bestScore || 0} / 40</strong>
                   </span>
                 </div>
-                <h4 className="stat-title">Module 2 Official Homework</h4>
+                <h4 className="stat-title">Module 0{modNum} Official Homework</h4>
                 <p className="stat-desc">
-                  5 problems covering input, rectangle dimensions, temperature conversion, and digit extraction.
+                  {isMod3
+                    ? '11 problems covering Conditionals (12m), Nested Conditions (4m), and Loops (24m).'
+                    : '5 problems covering input, rectangle dimensions, temperature conversion, and digit extraction.'}
                 </p>
                 <div className="stat-progress-bar">
                   <div
                     className="stat-fill"
-                    style={{ width: `${module2GradeSummary.homework?.bestPercentage || 0}%` }}
+                    style={{ width: `${activeGradeSummary.homework?.bestPercentage || 0}%` }}
                   />
                 </div>
                 <div className="stat-bottom-row">
                   <span className="stat-pct">
-                    {module2GradeSummary.homework?.bestPercentage || 0}% Score ({module2GradeSummary.homework?.attemptsCount || 0} attempts)
+                    {activeGradeSummary.homework?.bestPercentage || 0}% Score ({activeGradeSummary.homework?.attemptsCount || 0} attempts)
                   </span>
                   <Link
-                    to={`/learn/${courseSlug}/module/2/lesson/module-2-homework`}
+                    to={`/learn/${courseSlug}/module/${modNum}/lesson/module-${modNum}-homework`}
                     className="btn btn-secondary btn-sm"
                   >
-                    {module2GradeSummary.homework?.attemptsCount > 0 ? 'Retry Homework →' : 'Start Homework →'}
+                    {activeGradeSummary.homework?.attemptsCount > 0 ? 'Retry Homework →' : 'Start Homework →'}
                   </Link>
                 </div>
               </div>
@@ -328,28 +344,30 @@ export default function ModulePage() {
                 <div className="stat-card-top">
                   <span className="stat-type">CODING QUIZ (60%)</span>
                   <span className="stat-marks">
-                    Best: <strong>{module2GradeSummary.quiz?.bestScore || 0} / 20</strong>
+                    Best: <strong>{activeGradeSummary.quiz?.bestScore || 0} / 20</strong>
                   </span>
                 </div>
-                <h4 className="stat-title">Module 2 Final Coding Quiz</h4>
+                <h4 className="stat-title">Module 0{modNum} Final Coding Quiz</h4>
                 <p className="stat-desc">
-                  6 integrated problems evaluating types, arithmetic, string operations, relational and logical logic.
+                  {isMod3
+                    ? '6 problems testing battery status, course access, countdown sum, multiples of 3, loop controls, and nested loops.'
+                    : '6 integrated problems evaluating types, arithmetic, string operations, relational and logical logic.'}
                 </p>
                 <div className="stat-progress-bar">
                   <div
                     className="stat-fill"
-                    style={{ width: `${module2GradeSummary.quiz?.bestPercentage || 0}%` }}
+                    style={{ width: `${activeGradeSummary.quiz?.bestPercentage || 0}%` }}
                   />
                 </div>
                 <div className="stat-bottom-row">
                   <span className="stat-pct">
-                    {module2GradeSummary.quiz?.bestPercentage || 0}% Score ({module2GradeSummary.quiz?.attemptsCount || 0} attempts)
+                    {activeGradeSummary.quiz?.bestPercentage || 0}% Score ({activeGradeSummary.quiz?.attemptsCount || 0} attempts)
                   </span>
                   <Link
-                    to={`/learn/${courseSlug}/module/2/lesson/module-2-coding-quiz`}
+                    to={`/learn/${courseSlug}/module/${modNum}/lesson/module-${modNum}-coding-quiz`}
                     className="btn btn-secondary btn-sm"
                   >
-                    {module2GradeSummary.quiz?.attemptsCount > 0 ? 'Retry Quiz →' : 'Start Quiz →'}
+                    {activeGradeSummary.quiz?.attemptsCount > 0 ? 'Retry Quiz →' : 'Start Quiz →'}
                   </Link>
                 </div>
               </div>
@@ -358,15 +376,15 @@ export default function ModulePage() {
               <div className="assessment-stat-card practice-card">
                 <div className="stat-card-top">
                   <span className="stat-type green">UNGRADED PRACTICE LAB</span>
-                  <span className="stat-marks green">9 Practice Sections</span>
+                  <span className="stat-marks green">{isMod3 ? '12 Practice Sections' : '9 Practice Sections'}</span>
                 </div>
-                <h4 className="stat-title">Module 2 Practice Notebook</h4>
+                <h4 className="stat-title">Module 0{modNum} Practice Notebook</h4>
                 <p className="stat-desc">
                   Interactive Pyodide notebook covering all lesson concepts with executable examples and designated student answer cells.
                 </p>
                 <div className="stat-actions-group">
                   <a
-                    href={`/lite/notebooks/index.html?path=module-2-practice.ipynb${user?.is_staff ? '&admin=1' : '&admin=0'}`}
+                    href={`/lite/notebooks/index.html?path=module-${modNum}-practice.ipynb${user?.is_staff ? '&admin=1' : '&admin=0'}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-primary btn-sm"

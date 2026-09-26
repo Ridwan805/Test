@@ -76,6 +76,7 @@ export default function CourseDashboard() {
     course,
     curriculum = [],
     module2GradeSummary,
+    module3GradeSummary,
     totalLessons = 15,
     completedLessons = 0,
     progressPercentage = 0
@@ -163,6 +164,7 @@ export default function CourseDashboard() {
             const isMod1 = mod.moduleNumber === 1;
             const isMod2 = mod.moduleNumber === 2;
             const isMod3 = mod.moduleNumber === 3;
+            const isMod4 = mod.moduleNumber === 4;
             const targetUrl = `/learn/${course.slug}/module/${mod.moduleNumber}`;
 
             return (
@@ -186,13 +188,19 @@ export default function CourseDashboard() {
                     {isMod1 && (
                       <span className="pill-badge pill-intro">INTRODUCTORY</span>
                     )}
-                    {isMod2 && (
+                    {(isMod2 || isMod3) && (
                       <span className="pill-badge pill-graded">GRADED (80% REQ)</span>
                     )}
                     {isMod3 && isLocked && (
                       <span className="pill-badge pill-lock-badge">🔒 LOCKED</span>
                     )}
                     {isMod3 && !isLocked && (
+                      <span className="pill-badge pill-unlocked">✓ UNLOCKED</span>
+                    )}
+                    {isMod4 && isLocked && (
+                      <span className="pill-badge pill-lock-badge">🔒 LOCKED</span>
+                    )}
+                    {isMod4 && !isLocked && (
                       <span className="pill-badge pill-unlocked">✓ UNLOCKED</span>
                     )}
                   </div>
@@ -208,12 +216,17 @@ export default function CourseDashboard() {
                   <div className="card-mod-meta-row">
                     <span>
                       {isLocked
-                        ? 'Prerequisite Locked (80% in Mod 2)'
+                        ? (isMod4 ? 'Prerequisite Locked (80% in Mod 3)' : 'Prerequisite Locked (80% in Mod 2)')
                         : `${modCompleted} of ${modTotal} Lessons (${pct}%)`}
                     </span>
                     {isMod2 && module2GradeSummary && (
                       <span style={{ fontWeight: 700, color: module2GradeSummary.passed ? '#16A34A' : '#B45309' }}>
                         Grade: {module2GradeSummary.moduleGrade}%
+                      </span>
+                    )}
+                    {isMod3 && module3GradeSummary && (
+                      <span style={{ fontWeight: 700, color: module3GradeSummary.passed ? '#16A34A' : '#B45309' }}>
+                        Grade: {module3GradeSummary.moduleGrade}%
                       </span>
                     )}
                   </div>
