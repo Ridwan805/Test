@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // Use reliable public DNS servers (Google 8.8.8.8 & Cloudflare 1.1.1.1) to resolve Atlas SRV records
 try {
@@ -23,19 +22,25 @@ const connectDB = async () => {
   const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/aintuition_db';
   
   try {
-    await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
     console.log(`[MongoDB Cloud] Connected successfully to MongoDB Atlas: ${mongoose.connection.host}`);
   } catch (err) {
-    console.warn(`[MongoDB Warning] Could not connect to remote MongoDB Atlas (${err.message}).`);
-    console.log('[MongoDB Fallback] Initializing MongoMemoryServer in-memory database for seamless local development...');
+    console.error(`[MongoDB Error] Could not connect to MongoDB Atlas (${err.message}).`);
     
+    // In production on Render/Vercel, fail with the Atlas error rather than running an in-memory database
+    if (process.env.NODE_ENV === 'production') {
+      throw err;
+    }
+
+    console.log('[MongoDB Fallback] Initializing MongoMemoryServer for local development...');
     try {
+      const { MongoMemoryServer } = await import('mongodb-memory-server');
       mongoMemoryServer = await MongoMemoryServer.create();
       const memUri = mongoMemoryServer.getUri();
       await mongoose.connect(memUri);
       console.log(`[MongoDB] Connected successfully to In-Memory MongoDB at: ${memUri}`);
     } catch (memErr) {
-      console.error('[MongoDB Error] Failed to start in-memory database:', memErr);
+      console.error('[MongoDB Error] Failed to start in-memory database:', memErr.message);
       process.exit(1);
     }
   }
