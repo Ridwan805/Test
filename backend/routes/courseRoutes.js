@@ -3,6 +3,7 @@ import Course from '../models/Course.js';
 import Module from '../models/Module.js';
 import Lesson from '../models/Lesson.js';
 import Assessment from '../models/Assessment.js';
+import AssessmentAttempt from '../models/AssessmentAttempt.js';
 import LessonProgress from '../models/LessonProgress.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
@@ -533,8 +534,8 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
       sidebarLessons
     });
   } catch (error) {
-    console.error('Fetch Lesson Error:', error.message);
-    res.status(500).json({ detail: 'Server error retrieving lesson' });
+    console.error('Fetch Lesson Error:', error);
+    res.status(500).json({ detail: error.message, stack: error.stack });
   }
 });
 
