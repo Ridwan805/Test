@@ -60,80 +60,88 @@ export default function AssessmentWorksheet({
         if (isMounted) {
           setAssessmentData(data);
 
-          // Populate initial starter code for each question
+          // Populate starter code or restore previously submitted code for each question
+          const lastSubmittedCode = data.attempts?.[0]?.submittedCode || {};
           const initialCode = {};
+
           if (data.assessment?.questions) {
             data.assessment.questions.forEach((q) => {
+              // If student previously submitted an answer, preserve their own work
+              if (lastSubmittedCode[q.id]) {
+                initialCode[q.id] = lastSubmittedCode[q.id];
+                return;
+              }
+
               if (isMod3) {
-                // Module 3 Homework starters
+                // Module 3 Homework starters (unsolved templates)
                 if (isHomework) {
                   if (q.id === 'hw-a1') {
-                    initialCode[q.id] = 'number = 8\n\n# Check if number is even or odd using % and if/else\nif number % 2 == 0:\n    result = "even"\nelse:\n    result = "odd"\n\nprint("The number is", result)';
+                    initialCode[q.id] = 'number = 8\n\n# Write your if/else logic below:\n# Set result = "even" if number is even, or "odd" if number is odd\n';
                   } else if (q.id === 'hw-a2') {
-                    initialCode[q.id] = 'text = "racecar"\n\n# Check if text reads the same forwards and backwards\nif text == text[::-1]:\n    is_palindrome = True\nelse:\n    is_palindrome = False\n\nprint("Is palindrome:", is_palindrome)';
+                    initialCode[q.id] = 'text = "racecar"\n\n# Write your palindrome checking logic below:\n# Set is_palindrome = True if text is a palindrome, or False otherwise\n';
                   } else if (q.id === 'hw-a3') {
-                    initialCode[q.id] = 'temperature = 25\n\n# Classify: >30 hot, 20..30 perfect, 10..<20 chilly, <10 cold\nif temperature > 30:\n    suggestion = "hot"\nelif temperature >= 20:\n    suggestion = "perfect for a walk"\nelif temperature >= 10:\n    suggestion = "chilly"\nelse:\n    suggestion = "cold"\n\nprint("Weather suggestion:", suggestion)';
+                    initialCode[q.id] = 'temperature = 25\n\n# Classify temperature into suggestion:\n# >30: "hot"\n# 20 to 30: "perfect for a walk"\n# 10 to <20: "chilly"\n# <10: "cold"\n# Store result in variable: suggestion\n';
                   } else if (q.id === 'hw-a4') {
-                    initialCode[q.id] = 'budget = 35\n\n# Classify: >50 fancy, 30..50 mid-range, 15..<30 casual, 10..<15 fast food, <10 stay home\nif budget > 50:\n    recommendation = "fancy restaurant"\nelif budget >= 30:\n    recommendation = "mid-range restaurant"\nelif budget >= 15:\n    recommendation = "casual dining"\nelif budget >= 10:\n    recommendation = "fast food"\nelse:\n    recommendation = "stay home"\n\nprint("Restaurant recommendation:", recommendation)';
+                    initialCode[q.id] = 'budget = 35\n\n# Classify budget into recommendation:\n# >50: "fancy restaurant"\n# 30 to 50: "mid-range restaurant"\n# 15 to <30: "casual dining"\n# 10 to <15: "fast food"\n# <10: "stay home"\n# Store result in variable: recommendation\n';
                   } else if (q.id === 'hw-b1') {
-                    initialCode[q.id] = 'age = 20\nlikes_action = True\n\n# Nested if-else recommendation\nif age >= 18:\n    if likes_action:\n        movie_recommendation = "action blockbuster"\n    else:\n        movie_recommendation = "drama or comedy"\nelse:\n    if likes_action:\n        movie_recommendation = "family action"\n    else:\n        movie_recommendation = "animated movie"\n\nprint("Recommended movie:", movie_recommendation)';
+                    initialCode[q.id] = 'age = 20\nlikes_action = True\n\n# Use nested if-else statements to determine movie_recommendation:\n# If age >= 18:\n#     if likes_action: "action blockbuster"\n#     else: "drama or comedy"\n# Else:\n#     if likes_action: "family action"\n#     else: "animated movie"\n# Store result in variable: movie_recommendation\n';
                   } else if (q.id === 'hw-c1') {
-                    initialCode[q.id] = 'even_sum = 0\ncurrent_num = 1\n\n# Use a while loop to sum all even numbers between 1 and 100\nwhile current_num <= 100:\n    if current_num % 2 == 0:\n        even_sum += current_num\n    current_num += 1\n\nprint("Sum of even numbers 1..100:", even_sum)';
+                    initialCode[q.id] = 'even_sum = 0\ncurrent_num = 1\n\n# Use a while loop to sum all even numbers between 1 and 100:\n# Accumulate into: even_sum\n';
                   } else if (q.id === 'hw-c2') {
-                    initialCode[q.id] = 'number = 5\ntable_results = []\ncounter = 1\n\n# Use a while loop to generate multiplication table up to 10\nwhile counter <= 10:\n    table_results.append(number * counter)\n    counter += 1\n\nprint("Multiplication table:", table_results)';
+                    initialCode[q.id] = 'number = 5\ntable_results = []\ncounter = 1\n\n# Use a while loop to generate the multiplication table of number up to 10:\n# Append each product to: table_results\n';
                   } else if (q.id === 'hw-c3') {
-                    initialCode[q.id] = 'car_name = "Tesla"\nn = 3\ncar_list = []\ncount = 0\n\n# Use a while loop to repeat car_name n times\nwhile count < n:\n    car_list.append(car_name)\n    count += 1\n\nprint("Car list:", car_list)';
+                    initialCode[q.id] = 'car_name = "Tesla"\nn = 3\ncar_list = []\ncount = 0\n\n# Use a while loop to append car_name to car_list n times:\n';
                   } else if (q.id === 'hw-c4') {
-                    initialCode[q.id] = 'n = 5\nalternating_sum = 0\n\n# For loop: odd square added, even square subtracted\nfor i in range(1, n + 1):\n    if i % 2 != 0:\n        alternating_sum += i ** 2\n    else:\n        alternating_sum -= i ** 2\n\nprint("Alternating sum of squares:", alternating_sum)';
+                    initialCode[q.id] = 'n = 5\nalternating_sum = 0\n\n# Use a for loop with range(1, n + 1):\n# Add the square of odd numbers (i ** 2)\n# Subtract the square of even numbers (i ** 2)\n# Accumulate into: alternating_sum\n';
                   } else if (q.id === 'hw-c5') {
-                    initialCode[q.id] = 'word = "hello"\nprefixes = []\n\n# Generate all prefixes using a for loop\nfor i in range(1, len(word) + 1):\n    prefixes.append(word[:i])\n\nprint("Prefixes:", prefixes)';
+                    initialCode[q.id] = 'word = "hello"\nprefixes = []\n\n# Use a for loop to append all prefixes of word into prefixes:\n# e.g., ["h", "he", "hel", "hell", "hello"]\n';
                   } else if (q.id === 'hw-c6') {
-                    initialCode[q.id] = 'n = 5\nfactorial_result = 1\n\n# Calculate factorial of n using a for loop\nfor i in range(1, n + 1):\n    factorial_result *= i\n\nprint(f"{n}! =", factorial_result)';
+                    initialCode[q.id] = 'n = 5\nfactorial_result = 1\n\n# Calculate the factorial of n using a for loop:\n# Store the final product in: factorial_result\n';
                   }
                 } else {
-                  // Module 3 Quiz starters
+                  // Module 3 Quiz starters (unsolved templates)
                   if (q.id === 'quiz-q1') {
-                    initialCode[q.id] = 'battery_level = 85\n\n# Determine battery_status using if/elif/else\nif battery_level >= 80:\n    battery_status = "High"\nelif battery_level >= 30:\n    battery_status = "Medium"\nelse:\n    battery_status = "Low"\n\nprint("Battery status:", battery_status)';
+                    initialCode[q.id] = 'battery_level = 85\n\n# Determine battery_status using if/elif/else:\n# >= 80: "High"\n# >= 30 and < 80: "Medium"\n# < 30: "Low"\n# Store result in variable: battery_status\n';
                   } else if (q.id === 'quiz-q2') {
-                    initialCode[q.id] = 'age = 20\nhas_permission = True\n\n# Nested if-else for course access\nif age >= 18:\n    if has_permission:\n        access_result = "Access granted"\n    else:\n        access_result = "Permission required"\nelse:\n    access_result = "Age requirement not met"\n\nprint("Access result:", access_result)';
+                    initialCode[q.id] = 'age = 20\nhas_permission = True\n\n# Use nested if-else to determine access_result:\n# If age >= 18:\n#     if has_permission: "Access granted"\n#     else: "Permission required"\n# Else:\n#     "Age requirement not met"\n# Store result in variable: access_result\n';
                   } else if (q.id === 'quiz-q3') {
-                    initialCode[q.id] = 'n = 4\ncountdown_sum = 0\ncurrent = n\n\n# Use a while loop from n down to 1\nwhile current >= 1:\n    countdown_sum += current\n    current -= 1\n\nprint("Countdown sum:", countdown_sum)';
+                    initialCode[q.id] = 'n = 4\ncountdown_sum = 0\ncurrent = n\n\n# Use a while loop counting down from n to 1:\n# Add each value of current to countdown_sum\n';
                   } else if (q.id === 'quiz-q4') {
-                    initialCode[q.id] = 'n = 10\nmultiple_sum = 0\n\n# Use for and range() to sum multiples of 3 from 1 to n\nfor i in range(1, n + 1):\n    if i % 3 == 0:\n        multiple_sum += i\n\nprint("Sum of multiples of 3:", multiple_sum)';
+                    initialCode[q.id] = 'n = 10\nmultiple_sum = 0\n\n# Use a for loop and range() to sum all multiples of 3 from 1 to n:\n# Store the total in: multiple_sum\n';
                   } else if (q.id === 'quiz-q5') {
-                    initialCode[q.id] = 'processed_sum = 0\n\n# for i in range(1, 21): skip if i % 3 == 0 (continue), break when i == 17\nfor i in range(1, 21):\n    if i == 17:\n        break\n    if i % 3 == 0:\n        continue\n    processed_sum += i\n\nprint("Processed sum:", processed_sum)';
+                    initialCode[q.id] = 'processed_sum = 0\n\n# Loop through numbers 1 to 20 using range(1, 21):\n# - Break the loop if the number is 17\n# - Skip the number using continue if it is divisible by 3\n# - Otherwise, add the number to processed_sum\n';
                   } else if (q.id === 'quiz-q6') {
-                    initialCode[q.id] = 'even_sum_pairs = 0\n\n# Nested loops for i and j from 1 to 4: count (i + j) % 2 == 0\nfor i in range(1, 5):\n    for j in range(1, 5):\n        if (i + j) % 2 == 0:\n            even_sum_pairs += 1\n\nprint("Even sum pairs count:", even_sum_pairs)';
+                    initialCode[q.id] = 'even_sum_pairs = 0\n\n# Use nested loops (i from 1 to 4, j from 1 to 4):\n# Count how many pairs (i, j) have an even sum: (i + j) % 2 == 0\n# Increment: even_sum_pairs\n';
                   }
                 }
               } else {
-                // Module 2 Homework starters
+                // Module 2 Homework starters (unsolved templates)
                 if (isHomework) {
                   if (q.id === 'hw-q1') {
-                    initialCode[q.id] = 'a = 12\nb = 4\n\naddition_result = a + b\nsubtraction_result = a - b\nmultiplication_result = a * b\n\nprint("Addition:", addition_result)\nprint("Subtraction:", subtraction_result)\nprint("Multiplication:", multiplication_result)';
+                    initialCode[q.id] = 'a = 12\nb = 4\n\n# Calculate addition, subtraction, and multiplication:\n# Store in: addition_result, subtraction_result, multiplication_result\n';
                   } else if (q.id === 'hw-q2') {
-                    initialCode[q.id] = 'length = 10\nbreadth = 5\n\narea = length * breadth\nperimeter = 2 * (length + breadth)\n\nprint("Area:", area)\nprint("Perimeter:", perimeter)';
+                    initialCode[q.id] = 'length = 10\nbreadth = 5\n\n# Calculate area and perimeter of the rectangle:\n# Store in: area, perimeter\n';
                   } else if (q.id === 'hw-q3') {
-                    initialCode[q.id] = 'celsius_input = 25\nfahrenheit_result = (9 / 5) * celsius_input + 32\n\nfahrenheit_input = 77\ncelsius_result = (5 / 9) * (fahrenheit_input - 32)\n\nprint("Celsius to Fahrenheit:", fahrenheit_result)\nprint("Fahrenheit to Celsius:", celsius_result)';
+                    initialCode[q.id] = 'celsius_input = 25\nfahrenheit_input = 77\n\n# Convert celsius_input to Fahrenheit: fahrenheit_result\n# Convert fahrenheit_input to Celsius: celsius_result\n';
                   } else if (q.id === 'hw-q4') {
-                    initialCode[q.id] = 'num_4digit = 3564\n\n# Use floor division (//)\nleftmost_digit = num_4digit // 1000\n\nprint("Leftmost digit:", leftmost_digit)';
+                    initialCode[q.id] = 'num_4digit = 3564\n\n# Use floor division (//) to extract the leftmost digit:\n# Store in: leftmost_digit\n';
                   } else if (q.id === 'hw-q5') {
-                    initialCode[q.id] = 'num_input = 7895\n\n# Use modulus (%)\nrightmost_digit = num_input % 10\n\nprint("Rightmost digit:", rightmost_digit)';
+                    initialCode[q.id] = 'num_input = 7895\n\n# Use modulus (%) to extract the rightmost digit:\n# Store in: rightmost_digit\n';
                   }
                 } else {
-                  // Module 2 Coding Quiz starter templates
+                  // Module 2 Coding Quiz starters (unsolved templates)
                   if (q.id === 'quiz-q1') {
-                    initialCode[q.id] = 'price_text = "29.99"\nquantity_text = "8"\n\nprice = float(price_text)\nquantity = int(quantity_text)\n\nprint("Price:", price, type(price))\nprint("Quantity:", quantity, type(quantity))';
+                    initialCode[q.id] = 'price_text = "29.99"\nquantity_text = "8"\n\n# Convert price_text to float: price\n# Convert quantity_text to integer: quantity\n';
                   } else if (q.id === 'quiz-q2') {
-                    initialCode[q.id] = 'total_cost = price * quantity\nhalf_cost = total_cost / 2\nwhole_units_per_pack = quantity // 3\nremaining_units = quantity % 3\n\nprint("Total Cost:", total_cost)\nprint("Half Cost:", half_cost)\nprint("Whole Units Per Pack:", whole_units_per_pack)\nprint("Remaining Units:", remaining_units)';
+                    initialCode[q.id] = 'price = 29.99\nquantity = 8\n\n# Using price and quantity, calculate:\n# total_cost, half_cost, whole_units_per_pack, remaining_units\n';
                   } else if (q.id === 'quiz-q3') {
-                    initialCode[q.id] = 'first_name = "Ada"\nlast_name = "Lovelace"\n\nfull_name = first_name + " " + last_name\nfull_name_upper = full_name.upper()\nname_length = len(full_name)\n\nprint("Full Name:", full_name)\nprint("Uppercase:", full_name_upper)\nprint("Length:", name_length)';
+                    initialCode[q.id] = 'first_name = "Ada"\nlast_name = "Lovelace"\n\n# Concatenate with a space to create: full_name\n# Convert to uppercase: full_name_upper\n# Find character length: name_length\n';
                   } else if (q.id === 'quiz-q4') {
-                    initialCode[q.id] = 'word = "Algorithms"\n\nfirst_char = word[0]\nlast_char = word[-1]\nfirst_three = word[:3]\nreversed_word = word[::-1]\n\nprint("First:", first_char)\nprint("Last:", last_char)\nprint("First Three:", first_three)\nprint("Reversed:", reversed_word)';
+                    initialCode[q.id] = 'word = "Algorithms"\n\n# Use indexing and slicing to extract:\n# first_char, last_char, first_three, reversed_word\n';
                   } else if (q.id === 'quiz-q5') {
-                    initialCode[q.id] = 'same_value = (quantity == name_length)\nquantity_larger = (quantity > name_length)\ndifferent_value = (quantity != name_length)\n\nprint("Same Value:", same_value)\nprint("Quantity Larger:", quantity_larger)\nprint("Different Value:", different_value)';
+                    initialCode[q.id] = 'quantity = 8\nname_length = 12\n\n# Use comparison operators (==, >, !=):\n# Set: same_value, quantity_larger, different_value\n';
                   } else if (q.id === 'quiz-q6') {
-                    initialCode[q.id] = 'logic_and = (quantity > 5 and name_length > 5)\nlogic_or = (quantity < 10 or name_length < 10)\nlogic_not = not (quantity == name_length)\n\nprint("Logic AND:", logic_and)\nprint("Logic OR:", logic_or)\nprint("Logic NOT:", logic_not)';
+                    initialCode[q.id] = 'quantity = 8\nname_length = 12\n\n# Use logical operators (and, or, not):\n# Set: logic_and, logic_or, logic_not\n';
                   }
                 }
               }
