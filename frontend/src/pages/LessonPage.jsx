@@ -6,13 +6,29 @@ import AssessmentWorksheet from '../components/assessment/AssessmentWorksheet';
 
 export default function LessonPage() {
   const {
-    courseSlug = 'intro-to-python',
+    courseSlug: rawCourseSlug = 'intro-to-python',
     moduleNumber = '1',
-    lessonSlug
+    lessonSlug: rawLessonSlug
   } = useParams();
+
+  const normalizeSlug = (slug) => {
+    if (!slug) return '';
+    let s = String(slug);
+    try { s = decodeURIComponent(s); } catch (e) {}
+    return s.trim().toLowerCase().replace(/\s+/g, '-');
+  };
+
+  const courseSlug = normalizeSlug(rawCourseSlug) || 'intro-to-python';
+  const lessonSlug = normalizeSlug(rawLessonSlug);
 
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if ((rawCourseSlug && rawCourseSlug !== courseSlug) || (rawLessonSlug && rawLessonSlug !== lessonSlug)) {
+      navigate(`/learn/${courseSlug}/module/${moduleNumber}/lesson/${lessonSlug}`, { replace: true });
+    }
+  }, [rawCourseSlug, rawLessonSlug, courseSlug, lessonSlug, moduleNumber, navigate]);
 
   const [lessonData, setLessonData] = useState(null);
   const [loading, setLoading] = useState(true);

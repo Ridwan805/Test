@@ -7,7 +7,15 @@ import { getModuleGradeSummary, checkLessonAccess } from '../utils/courseProgres
 export { getModuleGradeSummary, checkLessonAccess };
 
 // Helper to normalize slug parameter
-const cleanSlug = (slug) => (slug && slug.endsWith('/') ? slug.slice(0, -1) : slug);
+const cleanSlug = (slug) => {
+  if (!slug) return '';
+  let s = String(slug);
+  if (s.endsWith('/')) s = s.slice(0, -1);
+  try {
+    s = decodeURIComponent(s);
+  } catch (e) {}
+  return s.trim().toLowerCase().replace(/\s+/g, '-');
+};
 
 
 

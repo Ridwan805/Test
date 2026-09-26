@@ -18,8 +18,16 @@ import {
 
 const router = express.Router();
 
-// Helper to normalize slug parameter (strip trailing slash if present)
-const cleanSlug = (slug) => (slug && slug.endsWith('/') ? slug.slice(0, -1) : slug);
+// Helper to normalize slug parameter (strip trailing slash, decode URL encoding, convert spaces to hyphens)
+const cleanSlug = (slug) => {
+  if (!slug) return '';
+  let s = String(slug);
+  if (s.endsWith('/')) s = s.slice(0, -1);
+  try {
+    s = decodeURIComponent(s);
+  } catch (e) {}
+  return s.trim().toLowerCase().replace(/\s+/g, '-');
+};
 
 // @route   GET /api/courses/ or /api/courses
 // @desc    Get all published courses (public metadata)

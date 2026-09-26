@@ -3,9 +3,24 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 export default function ModulePage() {
-  const { courseSlug = 'intro-to-python', moduleNumber = '1' } = useParams();
+  const { courseSlug: rawCourseSlug = 'intro-to-python', moduleNumber = '1' } = useParams();
+
+  const normalizeSlug = (slug) => {
+    if (!slug) return '';
+    let s = String(slug);
+    try { s = decodeURIComponent(s); } catch (e) {}
+    return s.trim().toLowerCase().replace(/\s+/g, '-');
+  };
+
+  const courseSlug = normalizeSlug(rawCourseSlug) || 'intro-to-python';
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (rawCourseSlug && rawCourseSlug !== courseSlug) {
+      navigate(`/learn/${courseSlug}/module/${moduleNumber}`, { replace: true });
+    }
+  }, [rawCourseSlug, courseSlug, moduleNumber, navigate]);
 
   const [moduleData, setModuleData] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -181,7 +181,9 @@ export async function checkLessonAccess(userId, courseId, moduleNumber, lessonSl
   }
   const hwPassed = hwBestPercent >= 80;
 
-  const cleanSlug = String(lessonSlug || '').toLowerCase();
+  let cleanSlug = String(lessonSlug || '').toLowerCase();
+  try { cleanSlug = decodeURIComponent(cleanSlug); } catch (e) {}
+  cleanSlug = cleanSlug.trim().replace(/\s+/g, '-');
   const isHomework = cleanSlug.includes('homework');
   const isQuiz = cleanSlug.includes('quiz');
 
