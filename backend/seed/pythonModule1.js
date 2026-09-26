@@ -241,58 +241,65 @@ export async function seedPythonModule1() {
       slug: 'ides-and-getting-started',
       lessonNumber: 4,
       order: 4,
-      estimatedMinutes: 10,
+      estimatedMinutes: 8,
       content: [
         {
           type: 'heading',
           level: 2,
-          text: 'Python Basics and Installations'
+          text: 'Python Development Environment'
+        },
+        {
+          type: 'note',
+          title: 'Zero Installation Required For This Bootcamp',
+          text: 'For this bootcamp, you do not need to install any external software or IDE on your computer! You can practice and write all your code directly in our website\'s built-in interactive IDE.'
         },
         {
           type: 'paragraph',
-          text: 'We use IDEs to run Python codes. The full form of IDE is Integrated Development Environment, which is a software application that helps programmers develop software code efficiently.'
-        },
-        {
-          type: 'heading',
-          level: 3,
-          text: 'Major IDEs for Python Development'
+          text: 'While professional software developers sometimes use desktop tools like VS Code or PyCharm, EcoIntuition Academy has integrated a complete Python 3 engine directly into your browser using WebAssembly. There are no downloads, no command-line setups, and no configuration hurdles.'
         },
         {
           type: 'cards',
-          title: 'Popular Development Environments',
+          title: 'Benefits of Our Website Built-in IDE',
           cards: [
             {
-              title: 'Visual Studio Code (VS Code)',
-              description: 'A versatile, lightweight, highly extensible code editor widely favored in professional software development.',
-              tag: 'Code Editor'
+              title: 'No Installation Needed',
+              description: 'Zero software to download. Everything runs securely and instantly inside your browser.',
+              tag: 'Zero Setup'
             },
             {
-              title: 'Google Colab',
-              description: 'A zero-setup cloud notebook environment executing Python in the browser with free GPU access.',
-              tag: 'Cloud Notebook'
+              title: 'Live Practice & Output',
+              description: 'Execute Python statements immediately with real-time console feedback.',
+              tag: 'Interactive'
             },
             {
-              title: 'PyCharm',
-              description: 'A dedicated, feature-packed IDE specifically crafted for Python engineering by JetBrains.',
-              tag: 'Full IDE'
+              title: 'Runs on Any Device',
+              description: 'Practice on your laptop, Mac, Windows, or Chromebook without compatibility issues.',
+              tag: 'Universal'
             },
             {
-              title: 'Jupyter Notebooks',
-              description: 'An interactive computing environment ideal for running cells of Python, analyzing data, and rendering visualizations inline.',
-              tag: 'Data Science'
+              title: 'Full Python 3 Engine',
+              description: 'Powered by Pyodide WebAssembly, supporting standard Python syntax, calculations, and data structures.',
+              tag: 'Python 3'
             }
           ]
         },
         {
           type: 'heading',
           level: 3,
-          text: 'Environment Installation'
+          text: 'Your Built-in Website IDE Playground'
         },
         {
-          type: 'link',
-          title: 'Jupyter Notebook Setup Video Guide',
-          url: 'https://www.youtube.com/watch?v=IMrxB8Mq5KU',
-          text: 'Step-by-step tutorial on installing and launching Jupyter Notebook on your machine.'
+          type: 'paragraph',
+          text: 'Try out the website built-in IDE below. Click "Start Built-in IDE", write your code, and run it instantly!'
+        },
+        {
+          type: 'jupyter',
+          title: 'Built-in Python IDE Playground',
+          instructions: 'For this bootcamp, you do not need to install any external software. Test and practice your Python code directly in our website built-in IDE below!',
+          starterCode: 'print("Welcome to EcoIntuition Academy Built-in IDE!")',
+          height: 420,
+          mode: 'repl',
+          notebookPath: 'lesson5_first_python_program.ipynb'
         }
       ],
       published: true
@@ -302,7 +309,7 @@ export async function seedPythonModule1() {
       slug: 'your-first-python-program',
       lessonNumber: 5,
       order: 5,
-      estimatedMinutes: 12,
+      estimatedMinutes: 15,
       content: [
         {
           type: 'heading',
@@ -325,6 +332,26 @@ export async function seedPythonModule1() {
         {
           type: 'heading',
           level: 3,
+          text: 'Interactive Practice Notebook: Run All Examples'
+        },
+        {
+          type: 'note',
+          title: 'Run Lesson Examples Live in the Notebook',
+          text: 'All the examples taught in this lesson are pre-loaded in the interactive notebook below. You can run each example cell to verify it produces the exact same results as shown in the lesson! If you want to practice freely, add new cells, or save your work, open the notebook in a separate tab using the button below—your notebook saves automatically to your browser storage.'
+        },
+        {
+          type: 'jupyter',
+          title: 'Lesson 5 Interactive Notebook — Run & Verify Examples',
+          instructions: 'Run each code cell in this notebook to see that it produces the exact same output as the lesson examples. You can also open the notebook in a separate tab to practice freely and save your work locally.',
+          starterCode: 'print("Hello World!")',
+          height: 520,
+          mode: 'notebook',
+          notebookPath: 'lesson5_first_python_program.ipynb',
+          readOnly: true
+        },
+        {
+          type: 'heading',
+          level: 3,
           text: 'Breaking Down the Code'
         },
         {
@@ -332,46 +359,53 @@ export async function seedPythonModule1() {
           text: 'First, we used the function print() which gives us the output. (We will learn more about functions in future modules). Inside the parentheses, we pass the parameter: a parameter is the input provided to a function. Here, we supply "Hello World!" as the input.'
         },
         {
+          type: 'paragraph',
+          text: 'Now it is your turn to modify the message! In the exercise below, change the text inside print() to any greeting you like.'
+        },
+        {
+          type: 'jupyter',
+          title: 'Example Demonstration: Change the Message',
+          instructions: 'Run the program to see how a custom string is printed. You can observe the exact output below.',
+          starterCode: 'print("Welcome to EcoIntuition Academy!")',
+          height: 380,
+          mode: 'repl',
+          notebookPath: 'lesson5_first_python_program.ipynb',
+          readOnly: true
+        },
+        {
+          type: 'heading',
+          level: 3,
+          text: 'Quotation Marks & String Literals'
+        },
+        {
           type: 'note',
           title: 'Quotation Marks Rule',
           text: 'Look carefully: while writing Hello World!, we put " " (double quotes) around the text. We can also use \' \' (single quotes). You must supply matching quotes around text (strings), otherwise Python will report a syntax error.'
         },
         {
-          type: 'heading',
-          level: 3,
-          text: 'Common Syntax Errors (What NOT to Do)'
-        },
-        {
           type: 'warning',
           title: 'Error 1: Missing Quotation Marks',
-          text: 'If you omit quotation marks around words, Python attempts to parse them as variable names or keywords:'
-        },
-        {
-          type: 'code',
-          language: 'python',
-          code: 'print(Hello World!)'
-        },
-        {
-          type: 'output',
-          text: 'SyntaxError: invalid syntax. Perhaps you forgot a comma?'
+          text: 'If you omit quotation marks around words, Python attempts to parse them as variable names or keywords: print(Hello World!) produces SyntaxError.'
         },
         {
           type: 'warning',
           title: 'Error 2: Mismatched Quotation Marks',
-          text: 'Opening with a single quote and closing with a double quote (or vice-versa) results in an unterminated string literal:'
+          text: 'Opening with a double quote and closing with a single quote results in an unterminated string literal.'
         },
         {
-          type: 'code',
-          language: 'python',
-          code: "print('Hello World!\")\n# or\nprint(\"Hello World!')"
+          type: 'jupyter',
+          title: 'Example Demonstration: Fix the Quotation Error',
+          instructions: 'This demonstration runs the mismatched quotes example. Run it to see Python\'s real SyntaxError message.',
+          starterCode: 'print("Hello World!\')',
+          height: 380,
+          mode: 'repl',
+          notebookPath: 'lesson5_first_python_program.ipynb',
+          readOnly: true
         },
         {
-          type: 'output',
-          text: 'SyntaxError: unterminated string literal (detected at line 1)'
-        },
-        {
-          type: 'paragraph',
-          text: 'We will learn more about errors and how to handle them in subsequent lessons.'
+          type: 'note',
+          title: 'Valid vs. Invalid Quotes Summary',
+          text: 'Correct: print("Hello World!") or print(\'Hello World!\')\nIncorrect: print("Hello World!\')'
         },
         {
           type: 'heading',
@@ -380,7 +414,7 @@ export async function seedPythonModule1() {
         },
         {
           type: 'paragraph',
-          text: 'Another important distinction: numbers do not need any quotation marks. For example:'
+          text: 'Another important rule from the curriculum: numbers do not need quotation marks! When you pass a number into print(), Python knows it is a numeric value.'
         },
         {
           type: 'code',
@@ -390,6 +424,16 @@ export async function seedPythonModule1() {
         {
           type: 'output',
           text: '100'
+        },
+        {
+          type: 'jupyter',
+          title: 'Example Demonstration: Print a Number',
+          instructions: 'Run the program to see the number 100 printed without quotation marks.',
+          starterCode: 'print(100)',
+          height: 380,
+          mode: 'repl',
+          notebookPath: 'lesson5_first_python_program.ipynb',
+          readOnly: true
         },
         {
           type: 'note',

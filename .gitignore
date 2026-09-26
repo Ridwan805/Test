@@ -12,6 +12,11 @@ frontend/node_modules/
 frontend/dist/
 frontend/local.env
 
+# JupyterLite Temporary Build Files & Caches
+*.doit.db
+.jupyterlite.doit.db
+jupyterlite-project/_output/
+
 # System Files
 .DS_Store
 Thumbs.db

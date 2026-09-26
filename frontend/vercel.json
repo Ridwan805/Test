@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/lite/:match*",
+      "destination": "/lite/:match*"
+    },
+    {
+      "source": "/((?!lite).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "content": [
+    {
+      "content": null,
+      "created": "2026-09-26T10:46:50.248094Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-09-26T10:02:19.603517Z",
+      "mimetype": null,
+      "name": "lesson5_first_python_program.ipynb",
+      "path": "lesson5_first_python_program.ipynb",
+      "size": 3098,
+      "type": "notebook",
+      "writable": false
+    },
+    {
+      "content": null,
+      "created": "2026-09-26T11:07:42.278438Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-09-26T11:07:29.398590Z",
+      "mimetype": null,
+      "name": "module-2-coding-quiz.ipynb",
+      "path": "module-2-coding-quiz.ipynb",
+      "size": 9758,
+      "type": "notebook",
+      "writable": false
+    },
+    {
+      "content": null,
+      "created": "2026-09-26T11:07:42.280113Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-09-26T11:07:29.397149Z",
+      "mimetype": null,
+      "name": "module-2-homework.ipynb",
+      "path": "module-2-homework.ipynb",
+      "size": 8797,
+      "type": "notebook",
+      "writable": false
+    },
+    {
+      "content": null,
+      "created": "2026-09-26T11:07:42.281176Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-09-26T11:07:29.397149Z",
+      "mimetype": null,
+      "name": "module-2-practice.ipynb",
+      "path": "module-2-practice.ipynb",
+      "size": 16711,
+      "type": "notebook",
+      "writable": false
+    }
+  ],
+  "created": "2026-09-26T09:26:14.274340Z",
+  "format": "json",
+  "hash": null,
+  "hash_algorithm": null,
+  "last_modified": "2026-09-26T11:07:42.281176Z",
+  "mimetype": null,
+  "name": "",
+  "path": "",
+  "size": null,
+  "type": "directory",
+  "writable": true
+}

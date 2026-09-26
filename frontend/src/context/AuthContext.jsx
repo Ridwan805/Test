@@ -7,6 +7,18 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Helper to sync user state with localStorage for JupyterLite and global permissions
+  const syncUserState = (userData) => {
+    setUser(userData);
+    if (userData) {
+      localStorage.setItem('user_is_staff', Boolean(userData.is_staff).toString());
+      localStorage.setItem('user_email', userData.email || '');
+    } else {
+      localStorage.removeItem('user_is_staff');
+      localStorage.removeItem('user_email');
+    }
+  };
+
   // Check if user is logged in on mount
   useEffect(() => {
     const fetchProfile = async () => {
@@ -20,15 +32,19 @@ export const AuthProvider = ({ children }) => {
           });
           if (res.ok) {
             const data = await res.json();
-            setUser(data);
+            syncUserState(data);
           } else {
             // Token might be expired
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
+            syncUserState(null);
           }
         } catch (err) {
           console.error("Failed to fetch user profile", err);
+          syncUserState(null);
         }
+      } else {
+        syncUserState(null);
       }
       setLoading(false);
     };
@@ -63,7 +79,7 @@ export const AuthProvider = ({ children }) => {
       });
       if (profileRes.ok) {
         const profileData = await profileRes.json();
-        setUser(profileData);
+        syncUserState(profileData);
         return true;
       }
       return false;
@@ -109,7 +125,7 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.setItem('access_token', data.access);
       localStorage.setItem('refresh_token', data.refresh);
-      setUser(data.user);
+      syncUserState(data.user);
       return true;
     } catch (err) {
       setError(err.message);
@@ -120,7 +136,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    setUser(null);
+    syncUserState(null);
   };
 
   return (

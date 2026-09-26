@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Courses from './pages/Courses';
 import Bootcamp from './pages/Bootcamp';
 import CourseDashboard from './pages/CourseDashboard';
+import ModulePage from './pages/ModulePage';
 import LessonPage from './pages/LessonPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Databank from './pages/Databank';
@@ -44,6 +45,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <CourseDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/learn/:courseSlug/module/:moduleNumber"
+                element={
+                  <ProtectedRoute>
+                    <ModulePage />
                   </ProtectedRoute>
                 }
               />

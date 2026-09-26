@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import JupyterLiteExercise from '../course/JupyterLiteExercise';
 
 function CodeBlock({ code, language = 'python' }) {
   const [copied, setCopied] = useState(false);
@@ -148,6 +149,67 @@ export default function ContentRenderer({ content = [] }) {
                   </a>
                 </div>
               </div>
+            );
+          }
+
+          case 'table': {
+            return (
+              <div key={idx} className="content-table-wrapper">
+                {block.title && <h4 className="content-table-title">{block.title}</h4>}
+                <div className="table-responsive">
+                  <table className="content-table">
+                    {block.headers && block.headers.length > 0 && (
+                      <thead>
+                        <tr>
+                          {block.headers.map((h, hIdx) => (
+                            <th key={hIdx}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                    )}
+                    <tbody>
+                      {block.rows?.map((row, rIdx) => (
+                        <tr key={rIdx}>
+                          {row.map((cell, cIdx) => (
+                            <td key={cIdx}>{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          }
+
+          case 'checkpoint': {
+            return (
+              <div key={idx} className="content-checkpoint-card">
+                <div className="checkpoint-header">
+                  <span className="checkpoint-badge">TRUTH-TABLE CHECKPOINT</span>
+                  <span className="checkpoint-tag">UNGRADED PRACTICE</span>
+                </div>
+                {block.title && <h3 className="checkpoint-title">{block.title}</h3>}
+                {block.instructions && <p className="checkpoint-desc">{block.instructions}</p>}
+                {block.code && (
+                  <CodeBlock code={block.code} language={block.language || 'python'} />
+                )}
+              </div>
+            );
+          }
+
+          case 'jupyter': {
+            return (
+              <JupyterLiteExercise
+                key={idx}
+                title={block.title}
+                instructions={block.instructions}
+                starterCode={block.starterCode || block.code || 'print("Hello World!")'}
+                height={block.height || 450}
+                mode={block.mode || 'repl'}
+                notebookPath={block.notebookPath || ''}
+                readOnly={Boolean(block.readOnly)}
+              />
             );
           }
 

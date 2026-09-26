@@ -2,8 +2,15 @@ import express from 'express';
 import Course from '../models/Course.js';
 import Module from '../models/Module.js';
 import Lesson from '../models/Lesson.js';
+import Assessment from '../models/Assessment.js';
 import LessonProgress from '../models/LessonProgress.js';
 import { protect } from '../middleware/authMiddleware.js';
+import {
+  getModuleGradeSummary,
+  getModuleGradeHandler,
+  getAssessmentDetailHandler,
+  submitAssessmentAttemptHandler
+} from '../controllers/assessmentController.js';
 
 const router = express.Router();
 
@@ -15,6 +22,7 @@ const cleanSlug = (slug) => (slug && slug.endsWith('/') ? slug.slice(0, -1) : sl
 router.get(['/', ''], async (req, res) => {
   try {
     const filter = {
+      courseType: { $ne: 'bootcamp' },
       $or: [{ published: true }, { is_published: true }]
     };
     if (req.query.type) {
@@ -103,6 +111,9 @@ router.get('/:slug/modules', protect, async (req, res) => {
       progressMap.set(String(p.lessonId), p.completed);
     });
 
+    // Fetch Module 2 grade summary for progression gating
+    const mod2GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 2);
+
     const curriculum = modules.map((m) => {
       const mObj = m.toJSON();
       mObj.lessons = lessons
@@ -111,6 +122,21 @@ router.get('/:slug/modules', protect, async (req, res) => {
           ...l.toJSON(),
           completed: progressMap.get(String(l._id)) || false
         }));
+
+      // Role and progression rules:
+      if (m.moduleNumber === 1) {
+        mObj.isLocked = false;
+        mObj.hasGradeRequirement = false;
+      } else if (m.moduleNumber === 2) {
+        mObj.isLocked = false;
+        mObj.hasGradeRequirement = true;
+        mObj.gradeSummary = mod2GradeSummary;
+      } else if (m.moduleNumber >= 3) {
+        mObj.hasGradeRequirement = true;
+        // Non-admins locked if Module 2 grade < 80%
+        mObj.isLocked = !mod2GradeSummary.passed && !req.user.is_staff;
+        mObj.lockReason = 'Complete Module 2 with at least 80% to unlock.';
+      }
       return mObj;
     });
 
@@ -128,12 +154,13 @@ router.get('/:slug/modules', protect, async (req, res) => {
         price: course.price
       },
       curriculum,
+      module2GradeSummary: mod2GradeSummary,
       totalLessons: lessons.length,
       completedLessons: completedCount,
       progressPercentage
     });
   } catch (error) {
-    console.error('Fetch Modules Error:', error.message);
+    console.error('Fetch Modules Error:', error);
     res.status(500).json({ detail: 'Server error retrieving curriculum' });
   }
 });
@@ -152,6 +179,22 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
 
     if (!course) {
       return res.status(404).json({ detail: 'Course not found' });
+    }
+
+    // Backend Module Lock: Module 3 requires Module 2 grade >= 80%
+    if (moduleNumber >= 3 && !req.user.is_staff) {
+      const mod2Grade = await getModuleGradeSummary(req.user._id, course._id, 2);
+      if (!mod2Grade.passed) {
+        return res.status(403).json({
+          detail: 'Module 3 is locked. Complete Module 2 with at least 80% to continue.',
+          locked: true,
+          moduleNumber,
+          module2Grade: mod2Grade.moduleGrade,
+          requiredGrade: 80,
+          homeworkPercentage: mod2Grade.homework.bestPercentage,
+          quizPercentage: mod2Grade.quiz.bestPercentage
+        });
+      }
     }
 
     const moduleDoc = await Module.findOne({ courseId: course._id, moduleNumber, published: true });
@@ -179,9 +222,19 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
       completed: progressMap.get(String(l._id)) || false
     }));
 
+    const mod2GradeSummary = moduleNumber === 2 ? await getModuleGradeSummary(req.user._id, course._id, 2) : null;
+
     res.json({
+      course: {
+        id: course._id,
+        title: course.title,
+        slug: course.slug,
+        level: course.level,
+        courseType: course.courseType
+      },
       module: moduleDoc,
-      lessons: lessonsWithProgress
+      lessons: lessonsWithProgress,
+      module2GradeSummary: mod2GradeSummary
     });
   } catch (error) {
     console.error('Fetch Module Error:', error.message);
@@ -205,17 +258,68 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
       return res.status(404).json({ detail: 'Course not found' });
     }
 
-    const lesson = await Lesson.findOne({
+    let lesson = await Lesson.findOne({
       courseId: course._id,
       slug: lessonSlug,
       published: true
     });
 
+    let isAssessmentItem = false;
+    let assessmentDoc = null;
+
     if (!lesson) {
-      return res.status(404).json({ detail: 'Lesson not found' });
+      assessmentDoc = await Assessment.findOne({
+        courseId: course._id,
+        slug: lessonSlug,
+        published: true
+      });
+
+      if (!assessmentDoc) {
+        return res.status(404).json({ detail: 'Lesson not found' });
+      }
+
+      isAssessmentItem = true;
+      lesson = {
+        _id: assessmentDoc._id,
+        courseId: course._id,
+        moduleId: assessmentDoc.moduleId,
+        title: assessmentDoc.title,
+        slug: assessmentDoc.slug,
+        lessonNumber: assessmentDoc.type === 'homework' ? 11 : 12,
+        order: assessmentDoc.type === 'homework' ? 11 : 12,
+        estimatedMinutes: 30,
+        content: [],
+        toJSON: () => ({
+          _id: assessmentDoc._id,
+          courseId: course._id,
+          moduleId: assessmentDoc.moduleId,
+          title: assessmentDoc.title,
+          slug: assessmentDoc.slug,
+          lessonNumber: assessmentDoc.type === 'homework' ? 11 : 12,
+          order: assessmentDoc.type === 'homework' ? 11 : 12,
+          estimatedMinutes: 30,
+          content: []
+        })
+      };
     }
 
     const moduleDoc = await Module.findById(lesson.moduleId);
+
+    // Backend Lesson Lock: Module 3 lessons require Module 2 grade >= 80%
+    if (moduleDoc && moduleDoc.moduleNumber >= 3 && !req.user.is_staff) {
+      const mod2Grade = await getModuleGradeSummary(req.user._id, course._id, 2);
+      if (!mod2Grade.passed) {
+        return res.status(403).json({
+          detail: 'This lesson is locked. Complete Module 2 with at least 80% to continue.',
+          locked: true,
+          moduleNumber: moduleDoc.moduleNumber,
+          module2Grade: mod2Grade.moduleGrade,
+          requiredGrade: 80,
+          homeworkPercentage: mod2Grade.homework.bestPercentage,
+          quizPercentage: mod2Grade.quiz.bestPercentage
+        });
+      }
+    }
 
     // Fetch all lessons in this module to determine navigation (prev / next) and sidebar
     const allModuleLessons = await Lesson.find(
@@ -236,22 +340,58 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
 
     const currentIndex = allModuleLessons.findIndex((l) => String(l._id) === String(lesson._id));
     const previousLesson = currentIndex > 0 ? allModuleLessons[currentIndex - 1] : null;
-    const nextLesson = currentIndex < allModuleLessons.length - 1 ? allModuleLessons[currentIndex + 1] : null;
+    const nextLesson = currentIndex >= 0 && currentIndex < allModuleLessons.length - 1 ? allModuleLessons[currentIndex + 1] : null;
 
-    // Track user access in LessonProgress
-    await LessonProgress.findOneAndUpdate(
-      { userId: req.user._id, lessonId: lesson._id },
-      {
-        $set: {
-          courseId: course._id,
-          moduleId: lesson.moduleId,
-          lastAccessedAt: new Date()
-        }
-      },
-      { upsert: true, setDefaultsOnInsert: true }
-    );
+    // Track user access in LessonProgress (only for regular lessons)
+    if (!isAssessmentItem) {
+      await LessonProgress.findOneAndUpdate(
+        { userId: req.user._id, lessonId: lesson._id },
+        {
+          $set: {
+            courseId: course._id,
+            moduleId: lesson.moduleId,
+            lastAccessedAt: new Date()
+          }
+        },
+        { upsert: true, setDefaultsOnInsert: true }
+      );
+    }
 
     const isCompleted = progressMap.get(String(lesson._id)) || false;
+
+    // Build sidebar items
+    const sidebarLessons = allModuleLessons.map((l) => ({
+      id: l._id,
+      title: l.title,
+      slug: l.slug,
+      lessonNumber: l.lessonNumber,
+      estimatedMinutes: l.estimatedMinutes,
+      completed: progressMap.get(String(l._id)) || false,
+      isCurrent: String(l._id) === String(lesson._id)
+    }));
+
+    if (moduleDoc && moduleDoc.moduleNumber === 2) {
+      sidebarLessons.push({
+        id: 'module-2-hw-sidebar',
+        title: 'Module 2 Homework (Graded)',
+        slug: 'module-2-homework',
+        lessonNumber: 11,
+        estimatedMinutes: 30,
+        completed: false,
+        isAssessment: true,
+        isCurrent: lessonSlug === 'module-2-homework'
+      });
+      sidebarLessons.push({
+        id: 'module-2-quiz-sidebar',
+        title: 'Module 2 Coding Quiz (Graded)',
+        slug: 'module-2-coding-quiz',
+        lessonNumber: 12,
+        estimatedMinutes: 30,
+        completed: false,
+        isAssessment: true,
+        isCurrent: lessonSlug === 'module-2-coding-quiz'
+      });
+    }
 
     res.json({
       course: {
@@ -276,15 +416,7 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
           ? { title: nextLesson.title, slug: nextLesson.slug, lessonNumber: nextLesson.lessonNumber }
           : null
       },
-      sidebarLessons: allModuleLessons.map((l) => ({
-        id: l._id,
-        title: l.title,
-        slug: l.slug,
-        lessonNumber: l.lessonNumber,
-        estimatedMinutes: l.estimatedMinutes,
-        completed: progressMap.get(String(l._id)) || false,
-        isCurrent: String(l._id) === String(lesson._id)
-      }))
+      sidebarLessons
     });
   } catch (error) {
     console.error('Fetch Lesson Error:', error.message);
@@ -402,5 +534,21 @@ router.post('/:slug/lessons/:lessonSlug/progress', protect, async (req, res) => 
     res.status(500).json({ detail: 'Server error updating lesson progress' });
   }
 });
+
+// ============================================================================
+// ASSESSMENTS & GRADING ENDPOINTS
+// ============================================================================
+
+// @route   GET /api/courses/:slug/modules/:moduleNumber/grade
+// @desc    Get user's grade summary and progression status for a module
+router.get('/:slug/modules/:moduleNumber/grade', protect, getModuleGradeHandler);
+
+// @route   GET /api/courses/:slug/assessments/:type
+// @desc    Get assessment metadata and student attempt history
+router.get('/:slug/assessments/:type', protect, getAssessmentDetailHandler);
+
+// @route   POST /api/courses/:slug/assessments/:type/submit
+// @desc    Submit assessment attempt, save result, recalculate module grade
+router.post('/:slug/assessments/:type/submit', protect, submitAssessmentAttemptHandler);
 
 export default router;

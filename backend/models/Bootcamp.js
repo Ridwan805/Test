@@ -52,6 +52,29 @@ const bootcampSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  tuition: {
+    type: String,
+    default: 'Free'
+  },
+  price: {
+    type: Number,
+    default: 0
+  },
+  topics: [{
+    type: String
+  }],
+  techIcon: {
+    type: String,
+    default: ''
+  },
+  techClass: {
+    type: String,
+    default: ''
+  },
+  totalLessons: {
+    type: Number,
+    default: 5
+  },
   is_published: {
     type: Boolean,
     default: true

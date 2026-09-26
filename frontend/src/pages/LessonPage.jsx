@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import ContentRenderer from '../components/lesson/ContentRenderer';
+import AssessmentWorksheet from '../components/assessment/AssessmentWorksheet';
 
 export default function LessonPage() {
   const {
@@ -130,6 +131,34 @@ export default function LessonPage() {
   }
 
   const { course, module: currentModule, lesson, navigation, sidebarLessons = [] } = lessonData;
+  const isModule2 = currentModule.moduleNumber === 2;
+  const isHomeworkLesson = lessonSlug === 'module-2-homework' || lessonSlug === 'homework';
+  const isQuizLesson = lessonSlug === 'module-2-coding-quiz' || lessonSlug === 'coding-quiz';
+
+  const handleResetPractice = async () => {
+    if (window.confirm("Are you sure you want to reset your Module 2 Practice Notebook? This will restore a fresh copy from the master template.")) {
+      try {
+        if (window.indexedDB && window.indexedDB.databases) {
+          const dbs = await window.indexedDB.databases();
+          for (const dbInfo of dbs) {
+            if (dbInfo.name && dbInfo.name.includes('JupyterLite')) {
+              const req = window.indexedDB.open(dbInfo.name);
+              req.onsuccess = (e) => {
+                const db = e.target.result;
+                if (db.objectStoreNames.contains('files')) {
+                  const tx = db.transaction('files', 'readwrite');
+                  tx.objectStore('files').delete('module-2-practice.ipynb');
+                }
+              };
+            }
+          }
+        }
+        alert("Practice Notebook reset to template successfully! Click 'Open Practice Notebook' to begin fresh.");
+      } catch (err) {
+        alert("Practice template ready. Please refresh your notebook tab.");
+      }
+    }
+  };
 
   return (
     <div className="lesson-page-wrapper">
@@ -150,9 +179,14 @@ export default function LessonPage() {
         {/* LEFT: Module Sidebar */}
         <aside className={`lesson-sidebar ${sidebarOpen ? 'sidebar-visible' : ''}`}>
           <div className="sidebar-header">
-            <Link to={`/learn/${courseSlug}`} className="sidebar-back-link">
-              ← Course Dashboard
-            </Link>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+              <Link to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}`} className="sidebar-back-link" style={{ marginBottom: 0 }}>
+                ← Module 0{currentModule.moduleNumber} Lessons
+              </Link>
+              <Link to={`/learn/${courseSlug}`} className="sidebar-back-link" style={{ marginBottom: 0 }}>
+                Dashboard
+              </Link>
+            </div>
             <span className="sidebar-course-title">{course.title}</span>
             <h3 className="sidebar-module-title">
               Module {currentModule.moduleNumber}: {currentModule.title}
@@ -164,21 +198,57 @@ export default function LessonPage() {
               {sidebarLessons.map((item, idx) => {
                 const isActive = item.slug === lessonSlug;
                 return (
-                  <li key={item.id || idx}>
-                    <Link
-                      to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}/lesson/${item.slug}`}
-                      className={`sidebar-lesson-item ${isActive ? 'active' : ''} ${item.completed ? 'completed' : ''}`}
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <span className="item-status-icon" aria-hidden="true">
-                        {item.completed ? '✓' : '○'}
-                      </span>
-                      <div className="item-text-wrapper">
-                        <span className="item-lesson-num">Lesson {item.lessonNumber || idx + 1}</span>
-                        <span className="item-title">{item.title}</span>
-                      </div>
-                    </Link>
-                  </li>
+                  <React.Fragment key={item.id || idx}>
+                    <li className="sidebar-lesson-li">
+                      <Link
+                        to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}/lesson/${item.slug}`}
+                        className={`sidebar-lesson-item ${isActive ? 'active' : ''} ${item.completed ? 'completed' : ''}`}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <span className="item-status-icon" aria-hidden="true">
+                          {item.completed ? '✓' : '○'}
+                        </span>
+                        <div className="item-text-wrapper">
+                          <span className="item-lesson-num">Lesson {item.lessonNumber || idx + 1}</span>
+                          <span className="item-title">{item.title}</span>
+                        </div>
+                      </Link>
+                    </li>
+
+                    {/* Insert Official Homework link right after Lesson 8 Arithmetic Operators */}
+                    {isModule2 && item.lessonNumber === 8 && (
+                      <li className="sidebar-assessment-divider">
+                        <Link
+                          to={`/learn/${courseSlug}/module/2/lesson/module-2-homework`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-2-homework' ? 'active' : ''}`}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <span className="assessment-badge-icon">⭐</span>
+                          <div className="item-text-wrapper">
+                            <span className="item-lesson-num">GRADED HOMEWORK (40%)</span>
+                            <span className="item-title">Module 2 Homework (40 Marks)</span>
+                          </div>
+                        </Link>
+                      </li>
+                    )}
+
+                    {/* Insert Final Coding Quiz link right after Checkpoint (Lesson 10) */}
+                    {isModule2 && item.lessonNumber === 10 && (
+                      <li className="sidebar-assessment-divider">
+                        <Link
+                          to={`/learn/${courseSlug}/module/2/lesson/module-2-coding-quiz`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-2-coding-quiz' ? 'active' : ''}`}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <span className="assessment-badge-icon">🏆</span>
+                          <div className="item-text-wrapper">
+                            <span className="item-lesson-num">GRADED FINAL QUIZ (60%)</span>
+                            <span className="item-title">Module 2 Coding Quiz (20 Marks)</span>
+                          </div>
+                        </Link>
+                      </li>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </ul>
@@ -202,40 +272,86 @@ export default function LessonPage() {
             <span>Module {currentModule.moduleNumber}</span>
           </nav>
 
-          {/* Lesson Header */}
-          <header className="lesson-header">
-            <div className="lesson-meta-bar">
-              <span className="lesson-badge">LESSON 0{lesson.lessonNumber}</span>
-              <span className="lesson-time">~{lesson.estimatedMinutes || 10} min read</span>
-              {lesson.completed && (
-                <span className="lesson-completed-tag">✓ Completed</span>
-              )}
+          {/* Module 2 Practice & Assessment Quick Actions Banner */}
+          {isModule2 && (
+            <div className="module2-quick-banner">
+              <div className="quick-banner-left">
+                <span className="quick-pill">MODULE 2 LAB TOOLS</span>
+                <span className="quick-title">Practice Notebook (Ungraded) & Assessments</span>
+              </div>
+              <div className="quick-banner-actions">
+                <a
+                  href={`/lite/notebooks/index.html?path=module-2-practice.ipynb${user?.is_staff ? '&admin=1' : '&admin=0'}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary btn-sm"
+                  title="Open ungraded interactive practice notebook in new tab"
+                >
+                  ↗ Open Practice Notebook
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={handleResetPractice}
+                  title="Reset student practice cells to fresh master template"
+                >
+                  ↺ Reset Practice Notebook
+                </button>
+              </div>
             </div>
-            <h1 className="lesson-page-title">{lesson.title}</h1>
-          </header>
+          )}
 
-          {/* Structured Content Blocks */}
-          <article className="lesson-article">
-            <ContentRenderer content={lesson.content} />
-          </article>
+          {/* Assessment Worksheet Mode (Homework or Coding Quiz) */}
+          {isHomeworkLesson ? (
+            <AssessmentWorksheet
+              courseSlug={courseSlug}
+              assessmentType="homework"
+              onSubmitted={() => {}}
+            />
+          ) : isQuizLesson ? (
+            <AssessmentWorksheet
+              courseSlug={courseSlug}
+              assessmentType="quiz"
+              onSubmitted={() => {}}
+            />
+          ) : (
+            <>
+              {/* Lesson Header */}
+              <header className="lesson-header">
+                <div className="lesson-meta-bar">
+                  <span className="lesson-badge">LESSON 0{lesson.lessonNumber}</span>
+                  <span className="lesson-time">~{lesson.estimatedMinutes || 10} min read</span>
+                  {lesson.completed && (
+                    <span className="lesson-completed-tag">✓ Completed</span>
+                  )}
+                </div>
+                <h1 className="lesson-page-title">{lesson.title}</h1>
+              </header>
 
-          {/* Mark Complete Action Bar */}
-          <div className="lesson-completion-bar">
-            <button
-              type="button"
-              className={`btn ${lesson.completed ? 'btn-completed-active' : 'btn-primary'}`}
-              onClick={toggleComplete}
-              disabled={isUpdatingProgress}
-            >
-              {isUpdatingProgress ? (
-                'Updating...'
-              ) : lesson.completed ? (
-                '✓ Lesson Completed (Click to Undo)'
-              ) : (
-                'Mark Lesson Complete'
-              )}
-            </button>
-          </div>
+              {/* Structured Content Blocks */}
+              <article className="lesson-article">
+                <ContentRenderer content={lesson.content} />
+              </article>
+
+              {/* Mark Complete Action Bar */}
+              <div className="lesson-completion-bar">
+                <button
+                  type="button"
+                  className={`btn ${lesson.completed ? 'btn-completed-active' : 'btn-primary'}`}
+                  onClick={toggleComplete}
+                  disabled={isUpdatingProgress}
+                >
+                  {isUpdatingProgress ? (
+                    'Updating...'
+                  ) : lesson.completed ? (
+                    '✓ Lesson Completed (Click to Undo)'
+                  ) : (
+                    'Mark Lesson Complete'
+                  )}
+                </button>
+              </div>
+            </>
+          )}
 
           {/* Previous / Next Lesson Navigation */}
           <footer className="lesson-nav-footer">
@@ -265,9 +381,17 @@ export default function LessonPage() {
                   <span className="nav-arrow">Next &rarr;</span>
                   <span className="nav-lesson-name">{navigation.next.title}</span>
                 </Link>
+              ) : isModule2 && !isHomeworkLesson && !isQuizLesson ? (
+                <Link
+                  to={`/learn/${courseSlug}/module/2/lesson/module-2-homework`}
+                  className="nav-link-card next"
+                >
+                  <span className="nav-arrow">Continue to Assessment &rarr;</span>
+                  <span className="nav-lesson-name">Module 2 Official Homework</span>
+                </Link>
               ) : (
                 <Link to={`/learn/${courseSlug}`} className="nav-link-card next">
-                  <span className="nav-arrow">Finish Module 1 &rarr;</span>
+                  <span className="nav-arrow">Return to Dashboard &rarr;</span>
                   <span className="nav-lesson-name">Course Dashboard</span>
                 </Link>
               )}

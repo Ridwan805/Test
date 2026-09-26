@@ -1,0 +1,10 @@
+{
+  "LiteBuildConfig": {
+    "federated_extensions": [
+      "d:/Test/jupyterlite-project/extensions/@jupyterlite/pyodide-kernel-extension"
+    ],
+    "contents": [
+      "d:/Test/jupyterlite-project/files"
+    ]
+  }
+}

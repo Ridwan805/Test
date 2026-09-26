@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:lite": "python -m jupyterlite_core.app build --force --lite-dir=../jupyterlite-project --output-dir=./public/lite && python ../jupyterlite-project/lock_contents.py",
     "lint": "oxlint",
     "preview": "vite preview"
   },

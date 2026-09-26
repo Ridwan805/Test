@@ -9,7 +9,9 @@ import User from './models/User.js';
 import Bootcamp from './models/Bootcamp.js';
 import bootcampRoutes from './routes/bootcampRoutes.js';
 import { seedPythonModule1 } from './seed/pythonModule1.js';
+import { seedPythonModule2 } from './seed/pythonModule2.js';
 import { seedRModule1 } from './seed/rModule1.js';
+import { seedBootcamps } from './seed/bootcamps.js';
 
 dotenv.config();
 
@@ -83,31 +85,9 @@ try {
   console.error('[Server Startup Seed Warning]:', seedErr.message);
 }
 
-// Auto-seed / Ensure "Intro to Python" bootcamp exists with 5 modules
+// Auto-seed / Ensure bootcamps are populated in the dedicated bootcamps collection
 try {
-  const pythonBootcamp = await Bootcamp.findOne({ slug: 'intro-to-python' });
-  if (!pythonBootcamp) {
-    console.log('[Server Startup] Initializing "Intro to Python" bootcamp with 5 modules...');
-    await Bootcamp.create({
-      title: 'Intro to Python',
-      slug: 'intro-to-python',
-      tagline: 'A comprehensive, cohort-based foundational bootcamp mastering Python programming.',
-      description: 'An intensive, structured bootcamp covering the core foundations of Python programming with hands-on exercises, code labs, and real-world projects.',
-      duration: '6 Weeks',
-      format: 'Cohort-Based Intensive',
-      level: 'Beginner to Intermediate',
-      order: 1,
-      is_published: true,
-      modules: [
-        { title: 'Module 1', description: 'Curriculum details to be provided', order: 1 },
-        { title: 'Module 2', description: 'Curriculum details to be provided', order: 2 },
-        { title: 'Module 3', description: 'Curriculum details to be provided', order: 3 },
-        { title: 'Module 4', description: 'Curriculum details to be provided', order: 4 },
-        { title: 'Module 5', description: 'Curriculum details to be provided', order: 5 }
-      ]
-    });
-    console.log('[Server Startup] "Intro to Python" bootcamp initialized.');
-  }
+  await seedBootcamps();
 } catch (bootcampErr) {
   console.error('[Server Startup Bootcamp Warning]:', bootcampErr.message);
 }
@@ -117,6 +97,13 @@ try {
   await seedPythonModule1();
 } catch (seedModule1Err) {
   console.error('[Server Startup Python Module 1 Seed Warning]:', seedModule1Err.message);
+}
+
+// Auto-seed / Verify Python Module 2 with 9 structured lessons, checkpoint & assessments
+try {
+  await seedPythonModule2();
+} catch (seedModule2Err) {
+  console.error('[Server Startup Python Module 2 Seed Warning]:', seedModule2Err.message);
 }
 
 // Auto-seed / Verify R Module 1 with 5 structured lessons
@@ -158,9 +145,14 @@ app.get('/api/health', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`=================================================`);
-  console.log(`🚀 EcoIntuition MERN Server running on port ${PORT}`);
-  console.log(`📡 API Endpoints available at http://localhost:${PORT}/api/`);
-  console.log(`=================================================`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`=================================================`);
+    console.log(`🚀 EcoIntuition MERN Server running on port ${PORT}`);
+    console.log(`📡 API Endpoints available at http://localhost:${PORT}/api/`);
+    console.log(`=================================================`);
+  });
+}
+
+export default app;
+

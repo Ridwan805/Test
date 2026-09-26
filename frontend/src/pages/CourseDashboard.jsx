@@ -72,14 +72,26 @@ export default function CourseDashboard() {
     );
   }
 
-  const { course, curriculum = [], totalLessons = 5, completedLessons = 0, progressPercentage = 0 } = curriculumData;
-  const module1 = curriculum[0] || { title: 'Getting Started with Python', lessons: [] };
+  const {
+    course,
+    curriculum = [],
+    module2GradeSummary,
+    totalLessons = 15,
+    completedLessons = 0,
+    progressPercentage = 0
+  } = curriculumData;
 
-  // Determine next lesson to start/continue
-  const nextLesson = module1.lessons?.find((l) => !l.completed) || module1.lessons?.[0];
-  const nextLessonUrl = nextLesson
-    ? `/learn/${course.slug}/module/1/lesson/${nextLesson.slug}`
-    : `/learn/${course.slug}/module/1/lesson/${module1.lessons?.[0]?.slug || 'what-is-python'}`;
+  // Determine next uncompleted lesson across all accessible modules
+  let nextLessonUrl = `/learn/${course.slug}/module/1/lesson/what-is-python`;
+  for (const mod of curriculum) {
+    if (!mod.isLocked) {
+      const uncompleted = mod.lessons?.find((l) => !l.completed);
+      if (uncompleted) {
+        nextLessonUrl = `/learn/${course.slug}/module/${mod.moduleNumber}/lesson/${uncompleted.slug}`;
+        break;
+      }
+    }
+  }
 
   return (
     <div className="course-dashboard-page container">
@@ -94,20 +106,23 @@ export default function CourseDashboard() {
       <div className="dashboard-hero-card">
         <div className="dashboard-hero-top">
           <div className="dashboard-meta-pills">
-            <span className="pill-badge pill-type">BOOTCAMP</span>
+            <span className="pill-badge pill-type">FOUNDATIONAL BOOTCAMP</span>
             <span className="pill-badge pill-level">{course.level || 'Beginner'}</span>
             <span className="pill-badge pill-free">100% FREE SCHOLAR ACCESS</span>
+            {user?.is_staff && (
+              <span className="pill-badge pill-admin">🛡️ ADMIN PRIVILEGES ACTIVE</span>
+            )}
           </div>
           <h1 className="dashboard-course-title">{course.title}</h1>
           <p className="dashboard-user-greeting">
-            Welcome back, <strong>{user?.first_name || user?.email}</strong>. Track your progress across Module 1 below.
+            Welcome back, <strong>{user?.first_name || user?.email}</strong>. Select a module below to view its lessons and start learning.
           </p>
         </div>
 
         {/* Progress Bar & Primary Action */}
         <div className="dashboard-progress-section">
           <div className="progress-info-row">
-            <span className="progress-label">Course Progress</span>
+            <span className="progress-label">Overall Bootcamp Progress</span>
             <span className="progress-fraction">
               {completedLessons} of {totalLessons} Lessons Completed ({progressPercentage}%)
             </span>
@@ -124,46 +139,111 @@ export default function CourseDashboard() {
         </div>
       </div>
 
-      {/* Module 1 Curriculum Breakdown */}
-      <div className="dashboard-modules-section">
-        <div className="dashboard-section-header">
+      {/* Separate Module Cards Deck */}
+      <section className="modules-deck-section" style={{ marginBottom: '3rem' }}>
+        <div className="modules-deck-header">
           <div>
-            <span className="section-pretitle">CURRENT SYLLABUS</span>
-            <h2 className="dashboard-module-heading">Module 1 — {module1.title || 'Getting Started with Python'}</h2>
+            <span className="section-pretitle">ACADEMIC MODULES</span>
+            <h2 className="modules-deck-title">Bootcamp Modules</h2>
+            <p className="modules-deck-subtitle">
+              Click on any module card below to open its dedicated page and view all lessons.
+            </p>
           </div>
-          <span className="module-status-badge">
-            {completedLessons === totalLessons && totalLessons > 0 ? '✓ Module Completed' : 'In Progress'}
-          </span>
+          <div className="module-status-badge">
+            {completedLessons} of {totalLessons} Lessons Completed
+          </div>
         </div>
 
-        <div className="dashboard-lessons-list">
-          {module1.lessons?.map((lesson, idx) => (
-            <Link
-              key={lesson._id || idx}
-              to={`/learn/${course.slug}/module/1/lesson/${lesson.slug}`}
-              className={`dashboard-lesson-card ${lesson.completed ? 'lesson-card-completed' : ''}`}
-            >
-              <div className="lesson-card-left">
-                <span className={`lesson-card-num ${lesson.completed ? 'num-completed' : ''}`}>
-                  {lesson.completed ? '✓' : `0${lesson.lessonNumber || idx + 1}`}
-                </span>
-                <div className="lesson-card-info">
-                  <h3 className="lesson-card-title">{lesson.title}</h3>
-                  <span className="lesson-card-meta">
-                    Lesson {lesson.lessonNumber || idx + 1} &bull; ~{lesson.estimatedMinutes || 10} mins read
-                  </span>
+        <div className="modules-cards-grid">
+          {curriculum.map((mod) => {
+            const isLocked = Boolean(mod.isLocked);
+            const modCompleted = mod.lessons?.filter((l) => l.completed).length || 0;
+            const modTotal = mod.lessons?.length || 0;
+            const pct = modTotal > 0 ? Math.round((modCompleted / modTotal) * 100) : 0;
+            const isMod1 = mod.moduleNumber === 1;
+            const isMod2 = mod.moduleNumber === 2;
+            const isMod3 = mod.moduleNumber === 3;
+            const targetUrl = `/learn/${course.slug}/module/${mod.moduleNumber}`;
+
+            return (
+              <div
+                key={mod._id || mod.moduleNumber}
+                className={`module-deck-card ${isLocked ? 'is-locked-card' : ''}`}
+                onClick={() => navigate(targetUrl)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open Module 0${mod.moduleNumber} Lessons`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(targetUrl);
+                  }
+                }}
+              >
+                <div>
+                  <div className="card-top-badges">
+                    <span className="card-mod-num">MODULE 0{mod.moduleNumber}</span>
+                    {isMod1 && (
+                      <span className="pill-badge pill-intro">INTRODUCTORY</span>
+                    )}
+                    {isMod2 && (
+                      <span className="pill-badge pill-graded">GRADED (80% REQ)</span>
+                    )}
+                    {isMod3 && isLocked && (
+                      <span className="pill-badge pill-lock-badge">🔒 LOCKED</span>
+                    )}
+                    {isMod3 && !isLocked && (
+                      <span className="pill-badge pill-unlocked">✓ UNLOCKED</span>
+                    )}
+                  </div>
+
+                  <h3 className="card-mod-title">
+                    Module {mod.moduleNumber} — {mod.title}
+                  </h3>
+
+                  <p className="card-mod-desc">
+                    {mod.description || 'Core concepts and hands-on exercises.'}
+                  </p>
+
+                  <div className="card-mod-meta-row">
+                    <span>
+                      {isLocked
+                        ? 'Prerequisite Locked (80% in Mod 2)'
+                        : `${modCompleted} of ${modTotal} Lessons (${pct}%)`}
+                    </span>
+                    {isMod2 && module2GradeSummary && (
+                      <span style={{ fontWeight: 700, color: module2GradeSummary.passed ? '#16A34A' : '#B45309' }}>
+                        Grade: {module2GradeSummary.moduleGrade}%
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="card-mod-progress-track">
+                    <div
+                      className={`card-mod-progress-fill ${pct === 100 ? 'fill-completed' : ''}`}
+                      style={{ width: `${isLocked ? 0 : pct}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="card-action-btn-row">
+                  <Link
+                    to={targetUrl}
+                    className="card-cta-button"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {isLocked ? (
+                      '🔒 View Lock Requirements →'
+                    ) : (
+                      `Open Module 0${mod.moduleNumber} Lessons →`
+                    )}
+                  </Link>
                 </div>
               </div>
-
-              <div className="lesson-card-right">
-                <span className={`lesson-state-pill ${lesson.completed ? 'state-done' : 'state-todo'}`}>
-                  {lesson.completed ? 'Completed' : 'Start Lesson'}
-                </span>
-              </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
