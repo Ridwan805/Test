@@ -116,17 +116,26 @@ export default function Navbar() {
             >
               About Us
             </NavLink>
+            {user && (
+              <NavLink
+                to="/dashboard"
+                className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+                onClick={closeMenu}
+              >
+                Dashboard
+              </NavLink>
+            )}
           </nav>
 
           <div className="auth-buttons">
             {user ? (
               <>
-                <span className="welcome-text">
-                  Welcome, {user.first_name || 'Scholar'}
-                </span>
+                <Link to="/dashboard" className="btn btn-secondary btn-sm" onClick={closeMenu}>
+                  Dashboard
+                </Link>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-outline btn-sm"
                   onClick={() => {
                     closeMenu();
                     logout();
