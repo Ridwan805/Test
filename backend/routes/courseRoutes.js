@@ -527,12 +527,8 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
         completed: isCompleted
       },
       navigation: {
-        previous: previousLesson
-          ? { title: previousLesson.title, slug: previousLesson.slug, lessonNumber: previousLesson.lessonNumber }
-          : null,
-        next: nextLesson
-          ? { title: nextLesson.title, slug: nextLesson.slug, lessonNumber: nextLesson.lessonNumber }
-          : null
+        previous: prevNav,
+        next: nextNav
       },
       sidebarLessons
     });
