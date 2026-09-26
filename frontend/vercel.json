@@ -1,8 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://testx-q62t.onrender.com/api/:path*"
+      "source": "/api/(.*)",
+      "destination": "https://testx-q62t.onrender.com/api/$1"
+    },
+    {
+      "source": "/api",
+      "destination": "https://testx-q62t.onrender.com/api"
     },
     {
       "source": "/lite/:match*",
