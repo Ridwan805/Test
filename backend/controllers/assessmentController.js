@@ -2,101 +2,14 @@ import Course from '../models/Course.js';
 import Module from '../models/Module.js';
 import Assessment from '../models/Assessment.js';
 import AssessmentAttempt from '../models/AssessmentAttempt.js';
+import { getModuleGradeSummary, checkLessonAccess } from '../utils/courseProgression.js';
+
+export { getModuleGradeSummary, checkLessonAccess };
 
 // Helper to normalize slug parameter
 const cleanSlug = (slug) => (slug && slug.endsWith('/') ? slug.slice(0, -1) : slug);
 
-/**
- * Calculates current grade summary and progression status for a given module
- */
-export async function getModuleGradeSummary(userId, courseId, moduleNumber = 2) {
-  const modNum = parseInt(moduleNumber, 10) || 2;
-  const moduleDoc = await Module.findOne({ courseId, moduleNumber: modNum });
-  if (!moduleDoc) {
-    return {
-      moduleNumber: modNum,
-      moduleGrade: 0,
-      passed: false,
-      requiredGrade: 80,
-      module3Unlocked: false,
-      module4Unlocked: false,
-      homework: { maxPoints: 40, bestScore: 0, bestPercentage: 0, attemptsCount: 0, attempts: [] },
-      quiz: { maxPoints: 20, bestScore: 0, bestPercentage: 0, attemptsCount: 0, attempts: [] }
-    };
-  }
 
-  const assessments = await Assessment.find({ courseId, moduleId: moduleDoc._id, published: true });
-  const hwAssessment = assessments.find((a) => a.type === 'homework');
-  const quizAssessment = assessments.find((a) => a.type === 'quiz');
-
-  const attempts = await AssessmentAttempt.find({
-    userId,
-    courseId,
-    moduleId: moduleDoc._id
-  }).sort({ submittedAt: -1 });
-
-  const hwAttempts = attempts.filter((a) => a.assessmentType === 'homework');
-  const quizAttempts = attempts.filter((a) => a.assessmentType === 'quiz');
-
-  // Best valid Homework score and percentage
-  let bestHwScore = 0;
-  let bestHwPercent = 0;
-  for (const a of hwAttempts) {
-    if (a.earnedPoints > bestHwScore) {
-      bestHwScore = a.earnedPoints;
-      bestHwPercent = a.percentage;
-    }
-  }
-
-  // Best valid Quiz score and percentage
-  let bestQuizScore = 0;
-  let bestQuizPercent = 0;
-  for (const a of quizAttempts) {
-    if (a.earnedPoints > bestQuizScore) {
-      bestQuizScore = a.earnedPoints;
-      bestQuizPercent = a.percentage;
-    }
-  }
-
-  // Weightings: Homework 40%, Quiz 60%
-  const hwWeight = hwAssessment?.weight ?? 0.40;
-  const quizWeight = quizAssessment?.weight ?? 0.60;
-
-  // Grade formula: best HW % * 0.40 + best Quiz % * 0.60
-  const calculatedGrade = (bestHwPercent * hwWeight) + (bestQuizPercent * quizWeight);
-  const moduleGrade = Math.round(calculatedGrade * 10) / 10; // 1 decimal precision
-  const passed = moduleGrade >= 80;
-
-  return {
-    moduleId: moduleDoc._id,
-    moduleNumber: modNum,
-    moduleGrade,
-    passed,
-    requiredGrade: 80,
-    module3Unlocked: modNum === 2 ? passed : true,
-    module4Unlocked: modNum === 3 ? passed : false,
-    homework: {
-      assessmentId: hwAssessment?._id,
-      title: hwAssessment?.title || `Module ${modNum} Official Graded Homework`,
-      maxPoints: hwAssessment?.maxPoints || 40,
-      weight: hwWeight,
-      bestScore: bestHwScore,
-      bestPercentage: bestHwPercent,
-      attemptsCount: hwAttempts.length,
-      attempts: hwAttempts
-    },
-    quiz: {
-      assessmentId: quizAssessment?._id,
-      title: quizAssessment?.title || `Module ${modNum} Official Final Coding Quiz`,
-      maxPoints: quizAssessment?.maxPoints || 20,
-      weight: quizWeight,
-      bestScore: bestQuizScore,
-      bestPercentage: bestQuizPercent,
-      attemptsCount: quizAttempts.length,
-      attempts: quizAttempts
-    }
-  };
-}
 
 /**
  * Controller: GET /api/courses/:slug/modules/:moduleNumber/grade
@@ -188,6 +101,20 @@ export async function getAssessmentDetailHandler(req, res) {
 
     if (!assessment) {
       return res.status(404).json({ detail: `Assessment '${rawType}' not found` });
+    }
+
+    // Check lesson/assessment access starting from Module 2
+    if (targetModuleNumber >= 2 && !req.user.is_staff) {
+      const accessCheck = await checkLessonAccess(
+        req.user._id,
+        course._id,
+        targetModuleNumber,
+        assessment.slug || assessmentType,
+        req.user.is_staff
+      );
+      if (!accessCheck.accessible) {
+        return res.status(403).json(accessCheck);
+      }
     }
 
     // Fetch user's previous attempts for this assessment

@@ -19,12 +19,16 @@ export default function LessonPage() {
   const [error, setError] = useState(null);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockDetails, setLockDetails] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
     async function fetchLesson() {
       setLoading(true);
       setError(null);
+      setIsLocked(false);
+      setLockDetails(null);
       const token = localStorage.getItem('access_token');
 
       try {
@@ -36,6 +40,16 @@ export default function LessonPage() {
           navigate('/login', {
             state: { from: `/learn/${courseSlug}/module/${moduleNumber}/lesson/${lessonSlug}` }
           });
+          return;
+        }
+
+        if (res.status === 403) {
+          const lockData = await res.json();
+          if (isMounted) {
+            setIsLocked(true);
+            setLockDetails(lockData);
+            setLoading(false);
+          }
           return;
         }
 
@@ -112,6 +126,71 @@ export default function LessonPage() {
         <p style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-brand)', fontSize: '1.25rem' }}>
           Loading lesson...
         </p>
+      </div>
+    );
+  }
+
+  if (isLocked) {
+    return (
+      <div className="container" style={{ padding: '4rem 1rem', maxWidth: '760px', margin: '0 auto' }}>
+        <div className="dashboard-breadcrumb" style={{ marginBottom: '1.5rem' }}>
+          <Link to={`/learn/${courseSlug}/module/${moduleNumber}`} className="breadcrumb-back">
+            ← Back to Module {moduleNumber} Overview
+          </Link>
+        </div>
+
+        <div className="lesson-locked-screen" style={{ padding: '3.5rem 2rem', textAlign: 'center', background: '#FFFFFF', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '3.2rem', marginBottom: '1rem' }}>🔒</div>
+          <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-brand)', marginBottom: '0.75rem' }}>
+            {lockDetails?.reason === 'homework_required'
+              ? 'Homework Completion Required'
+              : lockDetails?.reason === 'previous_lesson_incomplete'
+              ? 'Previous Lesson Incomplete'
+              : `Lesson Locked`}
+          </h2>
+          <p style={{ color: '#475569', fontSize: '1.05rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+            {lockDetails?.detail || 'This lesson is locked until you complete the required prior material.'}
+          </p>
+
+          {lockDetails?.requiredLesson && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <Link
+                to={`/learn/${courseSlug}/module/${moduleNumber}/lesson/${lockDetails.requiredLesson.slug}`}
+                className="btn btn-primary btn-large"
+              >
+                Go to Lesson {lockDetails.requiredLesson.lessonNumber}: {lockDetails.requiredLesson.title} →
+              </Link>
+            </div>
+          )}
+
+          {lockDetails?.requiredHomework && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <Link
+                to={`/learn/${courseSlug}/module/${moduleNumber}/lesson/${lockDetails.requiredHomework.slug}`}
+                className="btn btn-primary btn-large"
+              >
+                Complete Module {moduleNumber} Homework (Pass with ≥80%) →
+              </Link>
+            </div>
+          )}
+
+          {lockDetails?.reason === 'module_locked' && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <Link
+                to={`/learn/${courseSlug}/module/${lockDetails.requiredModule || (parseInt(moduleNumber) - 1)}`}
+                className="btn btn-primary btn-large"
+              >
+                Go to Module {lockDetails.requiredModule || (parseInt(moduleNumber) - 1)} Overview →
+              </Link>
+            </div>
+          )}
+
+          <div>
+            <Link to={`/learn/${courseSlug}/module/${moduleNumber}`} className="btn btn-outline">
+              ← Return to Module Syllabus
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -210,21 +289,32 @@ export default function LessonPage() {
 
           <nav className="sidebar-nav" aria-label="Module Lessons">
             <ul className="sidebar-lesson-list">
-              {sidebarLessons.map((item, idx) => {
+              {sidebarLessons.filter((item) => !item.isAssessment).map((item, idx) => {
                 const isActive = item.slug === lessonSlug;
+                const hwItem = sidebarLessons.find((s) => s.isAssessment && s.slug === `module-${currentModNum}-homework`);
+                const quizItem = sidebarLessons.find((s) => s.isAssessment && s.slug === `module-${currentModNum}-coding-quiz`);
+
                 return (
                   <React.Fragment key={item.id || idx}>
                     <li className="sidebar-lesson-li">
                       <Link
                         to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}/lesson/${item.slug}`}
-                        className={`sidebar-lesson-item ${isActive ? 'active' : ''} ${item.completed ? 'completed' : ''}`}
+                        className={`sidebar-lesson-item ${isActive ? 'active' : ''} ${item.completed ? 'completed' : ''} ${item.locked ? 'locked' : ''}`}
                         onClick={() => setSidebarOpen(false)}
+                        title={item.lockReason || ''}
                       >
                         <span className="item-status-icon" aria-hidden="true">
-                          {item.completed ? '✓' : '○'}
+                          {item.completed ? '✓' : item.locked ? '🔒' : '○'}
                         </span>
                         <div className="item-text-wrapper">
-                          <span className="item-lesson-num">Lesson {item.lessonNumber || idx + 1}</span>
+                          <span className="item-lesson-num">
+                            Lesson {item.lessonNumber || idx + 1}
+                            {item.locked && (
+                              <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#D97706', fontWeight: 600 }}>
+                                (Locked)
+                              </span>
+                            )}
+                          </span>
                           <span className="item-title">{item.title}</span>
                         </div>
                       </Link>
@@ -235,12 +325,20 @@ export default function LessonPage() {
                       <li className="sidebar-assessment-divider">
                         <Link
                           to={`/learn/${courseSlug}/module/2/lesson/module-2-homework`}
-                          className={`sidebar-assessment-item ${lessonSlug === 'module-2-homework' ? 'active' : ''}`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-2-homework' ? 'active' : ''} ${hwItem?.locked ? 'locked' : ''}`}
                           onClick={() => setSidebarOpen(false)}
+                          title={hwItem?.lockReason || ''}
                         >
-                          <span className="assessment-badge-icon">⭐</span>
+                          <span className="assessment-badge-icon">{hwItem?.locked ? '🔒' : '⭐'}</span>
                           <div className="item-text-wrapper">
-                            <span className="item-lesson-num">GRADED HOMEWORK (40%)</span>
+                            <span className="item-lesson-num">
+                              GRADED HOMEWORK (40%)
+                              {hwItem?.locked && (
+                                <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#D97706', fontWeight: 600 }}>
+                                  (Locked)
+                                </span>
+                              )}
+                            </span>
                             <span className="item-title">Module 2 Homework (40 Marks)</span>
                           </div>
                         </Link>
@@ -250,12 +348,20 @@ export default function LessonPage() {
                       <li className="sidebar-assessment-divider">
                         <Link
                           to={`/learn/${courseSlug}/module/2/lesson/module-2-coding-quiz`}
-                          className={`sidebar-assessment-item ${lessonSlug === 'module-2-coding-quiz' ? 'active' : ''}`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-2-coding-quiz' ? 'active' : ''} ${quizItem?.locked ? 'locked' : ''}`}
                           onClick={() => setSidebarOpen(false)}
+                          title={quizItem?.lockReason || ''}
                         >
-                          <span className="assessment-badge-icon">🏆</span>
+                          <span className="assessment-badge-icon">{quizItem?.locked ? '🔒' : '🏆'}</span>
                           <div className="item-text-wrapper">
-                            <span className="item-lesson-num">GRADED FINAL QUIZ (60%)</span>
+                            <span className="item-lesson-num">
+                              GRADED FINAL QUIZ (60%)
+                              {quizItem?.locked && (
+                                <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#D97706', fontWeight: 600 }}>
+                                  (Locked)
+                                </span>
+                              )}
+                            </span>
                             <span className="item-title">Module 2 Coding Quiz (20 Marks)</span>
                           </div>
                         </Link>
@@ -267,12 +373,20 @@ export default function LessonPage() {
                       <li className="sidebar-assessment-divider">
                         <Link
                           to={`/learn/${courseSlug}/module/3/lesson/module-3-homework`}
-                          className={`sidebar-assessment-item ${lessonSlug === 'module-3-homework' ? 'active' : ''}`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-3-homework' ? 'active' : ''} ${hwItem?.locked ? 'locked' : ''}`}
                           onClick={() => setSidebarOpen(false)}
+                          title={hwItem?.lockReason || ''}
                         >
-                          <span className="assessment-badge-icon">⭐</span>
+                          <span className="assessment-badge-icon">{hwItem?.locked ? '🔒' : '⭐'}</span>
                           <div className="item-text-wrapper">
-                            <span className="item-lesson-num">GRADED HOMEWORK (40%)</span>
+                            <span className="item-lesson-num">
+                              GRADED HOMEWORK (40%)
+                              {hwItem?.locked && (
+                                <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#D97706', fontWeight: 600 }}>
+                                  (Locked)
+                                </span>
+                              )}
+                            </span>
                             <span className="item-title">Module 3 Homework (40 Marks)</span>
                           </div>
                         </Link>
@@ -282,12 +396,20 @@ export default function LessonPage() {
                       <li className="sidebar-assessment-divider">
                         <Link
                           to={`/learn/${courseSlug}/module/3/lesson/module-3-coding-quiz`}
-                          className={`sidebar-assessment-item ${lessonSlug === 'module-3-coding-quiz' ? 'active' : ''}`}
+                          className={`sidebar-assessment-item ${lessonSlug === 'module-3-coding-quiz' ? 'active' : ''} ${quizItem?.locked ? 'locked' : ''}`}
                           onClick={() => setSidebarOpen(false)}
+                          title={quizItem?.lockReason || ''}
                         >
-                          <span className="assessment-badge-icon">🏆</span>
+                          <span className="assessment-badge-icon">{quizItem?.locked ? '🔒' : '🏆'}</span>
                           <div className="item-text-wrapper">
-                            <span className="item-lesson-num">GRADED FINAL QUIZ (60%)</span>
+                            <span className="item-lesson-num">
+                              GRADED FINAL QUIZ (60%)
+                              {quizItem?.locked && (
+                                <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#D97706', fontWeight: 600 }}>
+                                  (Locked)
+                                </span>
+                              )}
+                            </span>
                             <span className="item-title">Module 3 Coding Quiz (20 Marks)</span>
                           </div>
                         </Link>
@@ -423,23 +545,17 @@ export default function LessonPage() {
               {navigation.next ? (
                 <Link
                   to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}/lesson/${navigation.next.slug}`}
-                  className="nav-link-card next"
+                  className={`nav-link-card next ${navigation.next.locked ? 'nav-locked' : ''}`}
                 >
-                  <span className="nav-arrow">Next &rarr;</span>
+                  <span className="nav-arrow">
+                    {navigation.next.locked ? '🔒 Next (Complete prior content first)' : 'Next &rarr;'}
+                  </span>
                   <span className="nav-lesson-name">{navigation.next.title}</span>
                 </Link>
-              ) : isModule2 && !isHomeworkLesson && !isQuizLesson ? (
-                <Link
-                  to={`/learn/${courseSlug}/module/2/lesson/module-2-homework`}
-                  className="nav-link-card next"
-                >
-                  <span className="nav-arrow">Continue to Assessment &rarr;</span>
-                  <span className="nav-lesson-name">Module 2 Official Homework</span>
-                </Link>
               ) : (
-                <Link to={`/learn/${courseSlug}`} className="nav-link-card next">
-                  <span className="nav-arrow">Return to Dashboard &rarr;</span>
-                  <span className="nav-lesson-name">Course Dashboard</span>
+                <Link to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}`} className="nav-link-card next">
+                  <span className="nav-arrow">Module Syllabus &rarr;</span>
+                  <span className="nav-lesson-name">Module 0{currentModule.moduleNumber} Overview</span>
                 </Link>
               )}
             </div>

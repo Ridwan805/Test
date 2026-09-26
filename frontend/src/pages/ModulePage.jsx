@@ -192,8 +192,14 @@ export default function ModulePage() {
   const isGradedModule = isMod2 || isMod3;
   const activeGradeSummary = isMod2 ? module2GradeSummary : isMod3 ? module3GradeSummary : null;
 
-  // Determine first incomplete lesson to start learning
-  const nextIncompleteLesson = lessons.find((l) => !l.completed);
+  const lesson8 = lessons.find((l) => l.lessonNumber === 8);
+  const isHomeworkUnlocked = !isGradedModule || user?.is_staff || (lesson8 ? lesson8.completed : true);
+  const isHomeworkPassed = (activeGradeSummary?.homework?.bestPercentage || 0) >= 80;
+  const allLessonsCompleted = lessons.length > 0 && lessons.every((l) => l.completed);
+  const isQuizUnlocked = !isGradedModule || user?.is_staff || (isHomeworkPassed && allLessonsCompleted);
+
+  // Determine first incomplete, unlocked lesson to start learning
+  const nextIncompleteLesson = lessons.find((l) => !l.completed && !l.locked);
   const primaryLesson = nextIncompleteLesson || lessons[0];
   const startLearningUrl = primaryLesson
     ? `/learn/${courseSlug}/module/${modNum}/lesson/${primaryLesson.slug}`
@@ -307,9 +313,11 @@ export default function ModulePage() {
             {/* Assessment Cards Grid */}
             <div className="assessments-grid">
               {/* Homework Card */}
-              <div className="assessment-stat-card">
+              <div className={`assessment-stat-card ${!isHomeworkUnlocked ? 'assessment-card-locked' : ''}`}>
                 <div className="stat-card-top">
-                  <span className="stat-type">GRADED HOMEWORK (40%)</span>
+                  <span className="stat-type">
+                    {isHomeworkUnlocked ? 'GRADED HOMEWORK (40%)' : '🔒 LOCKED (REQUIRES LESSON 8)'}
+                  </span>
                   <span className="stat-marks">
                     Best: <strong>{activeGradeSummary.homework?.bestScore || 0} / 40</strong>
                   </span>
@@ -332,17 +340,27 @@ export default function ModulePage() {
                   </span>
                   <Link
                     to={`/learn/${courseSlug}/module/${modNum}/lesson/module-${modNum}-homework`}
-                    className="btn btn-secondary btn-sm"
+                    className={`btn ${isHomeworkUnlocked ? 'btn-secondary' : 'btn-outline'} btn-sm`}
                   >
-                    {activeGradeSummary.homework?.attemptsCount > 0 ? 'Retry Homework →' : 'Start Homework →'}
+                    {!isHomeworkUnlocked
+                      ? '🔒 Locked'
+                      : activeGradeSummary.homework?.attemptsCount > 0
+                      ? 'Retry Homework →'
+                      : 'Start Homework →'}
                   </Link>
                 </div>
               </div>
 
               {/* Coding Quiz Card */}
-              <div className="assessment-stat-card">
+              <div className={`assessment-stat-card ${!isQuizUnlocked ? 'assessment-card-locked' : ''}`}>
                 <div className="stat-card-top">
-                  <span className="stat-type">CODING QUIZ (60%)</span>
+                  <span className="stat-type">
+                    {isQuizUnlocked
+                      ? 'CODING QUIZ (60%)'
+                      : !isHomeworkPassed
+                      ? '🔒 LOCKED (REQUIRES HW ≥80%)'
+                      : '🔒 LOCKED (REQUIRES ALL LESSONS)'}
+                  </span>
                   <span className="stat-marks">
                     Best: <strong>{activeGradeSummary.quiz?.bestScore || 0} / 20</strong>
                   </span>
@@ -365,9 +383,13 @@ export default function ModulePage() {
                   </span>
                   <Link
                     to={`/learn/${courseSlug}/module/${modNum}/lesson/module-${modNum}-coding-quiz`}
-                    className="btn btn-secondary btn-sm"
+                    className={`btn ${isQuizUnlocked ? 'btn-secondary' : 'btn-outline'} btn-sm`}
                   >
-                    {activeGradeSummary.quiz?.attemptsCount > 0 ? 'Retry Quiz →' : 'Start Quiz →'}
+                    {!isQuizUnlocked
+                      ? '🔒 Locked'
+                      : activeGradeSummary.quiz?.attemptsCount > 0
+                      ? 'Retry Quiz →'
+                      : 'Start Quiz →'}
                   </Link>
                 </div>
               </div>
@@ -426,23 +448,28 @@ export default function ModulePage() {
               <Link
                 key={lesson._id || idx}
                 to={`/learn/${courseSlug}/module/${modNum}/lesson/${lesson.slug}`}
-                className={`dashboard-lesson-card ${lesson.completed ? 'lesson-card-completed' : ''}`}
+                className={`dashboard-lesson-card ${lesson.completed ? 'lesson-card-completed' : ''} ${lesson.locked ? 'lesson-card-locked' : ''}`}
               >
                 <div className="lesson-card-left">
-                  <span className={`lesson-card-num ${lesson.completed ? 'num-completed' : ''}`}>
-                    {lesson.completed ? '✓' : `0${lesson.lessonNumber || idx + 1}`}
+                  <span className={`lesson-card-num ${lesson.completed ? 'num-completed' : ''} ${lesson.locked ? 'num-locked' : ''}`}>
+                    {lesson.completed ? '✓' : lesson.locked ? '🔒' : `0${lesson.lessonNumber || idx + 1}`}
                   </span>
                   <div className="lesson-card-info">
                     <h3 className="lesson-card-title">{lesson.title}</h3>
                     <span className="lesson-card-meta">
                       Lesson {lesson.lessonNumber || idx + 1} &bull; ~{lesson.estimatedMinutes || 10} mins read
+                      {lesson.locked && (
+                        <span style={{ color: '#D97706', marginLeft: '0.5rem', fontWeight: 600 }}>
+                          &bull; {lesson.lockReason || 'Locked'}
+                        </span>
+                      )}
                     </span>
                   </div>
                 </div>
 
                 <div className="lesson-card-right">
-                  <span className={`lesson-state-pill ${lesson.completed ? 'state-done' : 'state-todo'}`}>
-                    {lesson.completed ? 'Completed' : 'Start Lesson →'}
+                  <span className={`lesson-state-pill ${lesson.completed ? 'state-done' : lesson.locked ? 'state-locked' : 'state-todo'}`}>
+                    {lesson.completed ? 'Completed' : lesson.locked ? '🔒 Locked' : 'Start Lesson →'}
                   </span>
                 </div>
               </Link>

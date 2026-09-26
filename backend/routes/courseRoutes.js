@@ -7,6 +7,10 @@ import LessonProgress from '../models/LessonProgress.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
   getModuleGradeSummary,
+  checkLessonAccess,
+  getLessonsWithLockStatus
+} from '../utils/courseProgression.js';
+import {
   getModuleGradeHandler,
   getAssessmentDetailHandler,
   submitAssessmentAttemptHandler
@@ -225,25 +229,12 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
       return res.status(404).json({ detail: `Module ${moduleNumber} not found` });
     }
 
-    const lessons = await Lesson.find(
-      { moduleId: moduleDoc._id, published: true },
-      { title: 1, slug: 1, lessonNumber: 1, order: 1, estimatedMinutes: 1, moduleId: 1 }
-    ).sort({ order: 1 });
-
-    const userProgress = await LessonProgress.find({
-      userId: req.user._id,
-      moduleId: moduleDoc._id
-    });
-
-    const progressMap = new Map();
-    userProgress.forEach((p) => {
-      progressMap.set(String(p.lessonId), p.completed);
-    });
-
-    const lessonsWithProgress = lessons.map((l) => ({
-      ...l.toJSON(),
-      completed: progressMap.get(String(l._id)) || false
-    }));
+    const lessonsWithProgress = await getLessonsWithLockStatus(
+      req.user._id,
+      course._id,
+      moduleNumber,
+      req.user.is_staff
+    );
 
     const mod2GradeSummary = moduleNumber === 2 ? await getModuleGradeSummary(req.user._id, course._id, 2) : null;
     const mod3GradeSummary = moduleNumber === 3 ? await getModuleGradeSummary(req.user._id, course._id, 3) : null;
@@ -330,37 +321,16 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
 
     const moduleDoc = await Module.findById(lesson.moduleId);
 
-    // Backend Lesson Lock:
-    // Module 3 lessons require Module 2 grade >= 80%
-    if (moduleDoc && moduleDoc.moduleNumber === 3 && !req.user.is_staff) {
-      const mod2Grade = await getModuleGradeSummary(req.user._id, course._id, 2);
-      if (!mod2Grade.passed) {
-        return res.status(403).json({
-          detail: 'This lesson is locked. Complete Module 2 with at least 80% to continue.',
-          locked: true,
-          moduleNumber: moduleDoc.moduleNumber,
-          module2Grade: mod2Grade.moduleGrade,
-          requiredGrade: 80,
-          homeworkPercentage: mod2Grade.homework.bestPercentage,
-          quizPercentage: mod2Grade.quiz.bestPercentage
-        });
-      }
-    }
-
-    // Module 4+ lessons require Module 3 grade >= 80%
-    if (moduleDoc && moduleDoc.moduleNumber >= 4 && !req.user.is_staff) {
-      const mod3Grade = await getModuleGradeSummary(req.user._id, course._id, 3);
-      if (!mod3Grade.passed) {
-        return res.status(403).json({
-          detail: 'This lesson is locked. Complete Module 3 with at least 80% to continue.',
-          locked: true,
-          moduleNumber: moduleDoc.moduleNumber,
-          module3Grade: mod3Grade.moduleGrade,
-          requiredGrade: 80,
-          homeworkPercentage: mod3Grade.homework.bestPercentage,
-          quizPercentage: mod3Grade.quiz.bestPercentage
-        });
-      }
+    // Authoritative Lesson & Assessment Gating
+    const accessCheck = await checkLessonAccess(
+      req.user._id,
+      course._id,
+      moduleDoc?.moduleNumber || 1,
+      lessonSlug,
+      req.user.is_staff
+    );
+    if (!accessCheck.accessible) {
+      return res.status(403).json(accessCheck);
     }
 
     // Fetch all lessons in this module to determine navigation (prev / next) and sidebar
@@ -380,9 +350,22 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
       progressMap.set(String(p.lessonId), p.completed);
     });
 
-    const currentIndex = allModuleLessons.findIndex((l) => String(l._id) === String(lesson._id));
-    const previousLesson = currentIndex > 0 ? allModuleLessons[currentIndex - 1] : null;
-    const nextLesson = currentIndex >= 0 && currentIndex < allModuleLessons.length - 1 ? allModuleLessons[currentIndex + 1] : null;
+    // Homework status for this module
+    const hwAssessment = await Assessment.findOne({
+      courseId: course._id,
+      moduleId: lesson.moduleId,
+      type: 'homework',
+      published: true
+    });
+    let hwBestPercent = 0;
+    if (hwAssessment) {
+      const hwAttempts = await AssessmentAttempt.find({
+        userId: req.user._id,
+        assessmentId: hwAssessment._id
+      });
+      hwBestPercent = hwAttempts.reduce((max, a) => Math.max(max, a.percentage), 0);
+    }
+    const hwPassed = hwBestPercent >= 80;
 
     // Track user access in LessonProgress (only for regular lessons)
     if (!isAssessmentItem) {
@@ -401,59 +384,123 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
 
     const isCompleted = progressMap.get(String(lesson._id)) || false;
 
-    // Build sidebar items
-    const sidebarLessons = allModuleLessons.map((l) => ({
-      id: l._id,
-      title: l.title,
-      slug: l.slug,
-      lessonNumber: l.lessonNumber,
-      estimatedMinutes: l.estimatedMinutes,
-      completed: progressMap.get(String(l._id)) || false,
-      isCurrent: String(l._id) === String(lesson._id)
-    }));
+    // Build sidebar items with lock states
+    const sidebarLessons = allModuleLessons.map((l, idx) => {
+      let isLocked = false;
+      let lockReason = '';
+      if (!req.user.is_staff && moduleDoc && moduleDoc.moduleNumber >= 2) {
+        if (idx > 0) {
+          const prevLesson = allModuleLessons[idx - 1];
+          if (!progressMap.get(String(prevLesson._id))) {
+            isLocked = true;
+            lockReason = `Requires Lesson ${prevLesson.lessonNumber}`;
+          }
+        }
+        if (l.lessonNumber >= 9 && !hwPassed) {
+          isLocked = true;
+          lockReason = 'Requires Homework (≥80%)';
+        }
+      }
+      return {
+        id: l._id,
+        title: l.title,
+        slug: l.slug,
+        lessonNumber: l.lessonNumber,
+        estimatedMinutes: l.estimatedMinutes,
+        completed: progressMap.get(String(l._id)) || false,
+        isCurrent: String(l._id) === String(lesson._id),
+        locked: isLocked,
+        lockReason
+      };
+    });
 
-    if (moduleDoc && moduleDoc.moduleNumber === 2) {
+    if (moduleDoc && (moduleDoc.moduleNumber === 2 || moduleDoc.moduleNumber === 3)) {
+      const modNum = moduleDoc.moduleNumber;
+      const lesson8 = allModuleLessons.find((l) => l.lessonNumber === 8);
+      const lesson8Completed = lesson8 ? (progressMap.get(String(lesson8._id)) || false) : false;
+      const hwLocked = !req.user.is_staff && !lesson8Completed;
+
+      const lastLesson = allModuleLessons[allModuleLessons.length - 1];
+      const lastLessonCompleted = lastLesson ? (progressMap.get(String(lastLesson._id)) || false) : false;
+      const quizLocked = !req.user.is_staff && (!hwPassed || !lastLessonCompleted);
+
       sidebarLessons.push({
-        id: 'module-2-hw-sidebar',
-        title: 'Module 2 Homework (Graded)',
-        slug: 'module-2-homework',
+        id: `module-${modNum}-hw-sidebar`,
+        title: `Module ${modNum} Homework (Graded)`,
+        slug: `module-${modNum}-homework`,
         lessonNumber: 11,
         estimatedMinutes: 30,
-        completed: false,
+        completed: hwPassed,
         isAssessment: true,
-        isCurrent: lessonSlug === 'module-2-homework'
+        isCurrent: lessonSlug === `module-${modNum}-homework`,
+        locked: hwLocked,
+        lockReason: hwLocked ? 'Requires Lesson 8' : ''
       });
+
       sidebarLessons.push({
-        id: 'module-2-quiz-sidebar',
-        title: 'Module 2 Coding Quiz (Graded)',
-        slug: 'module-2-coding-quiz',
+        id: `module-${modNum}-quiz-sidebar`,
+        title: `Module ${modNum} Coding Quiz (Graded)`,
+        slug: `module-${modNum}-coding-quiz`,
         lessonNumber: 12,
         estimatedMinutes: 30,
         completed: false,
         isAssessment: true,
-        isCurrent: lessonSlug === 'module-2-coding-quiz'
+        isCurrent: lessonSlug === `module-${modNum}-coding-quiz`,
+        locked: quizLocked,
+        lockReason: !hwPassed ? 'Requires Homework (≥80%)' : (quizLocked ? 'Requires all lessons' : '')
       });
-    } else if (moduleDoc && moduleDoc.moduleNumber === 3) {
-      sidebarLessons.push({
-        id: 'module-3-hw-sidebar',
-        title: 'Module 3 Homework (Graded)',
-        slug: 'module-3-homework',
-        lessonNumber: 11,
-        estimatedMinutes: 30,
-        completed: false,
-        isAssessment: true,
-        isCurrent: lessonSlug === 'module-3-homework'
-      });
-      sidebarLessons.push({
-        id: 'module-3-quiz-sidebar',
-        title: 'Module 3 Coding Quiz (Graded)',
-        slug: 'module-3-coding-quiz',
-        lessonNumber: 12,
-        estimatedMinutes: 30,
-        completed: false,
-        isAssessment: true,
-        isCurrent: lessonSlug === 'module-3-coding-quiz'
-      });
+    }
+
+    // Determine Prev / Next Navigation taking Homework & Quiz into sequence
+    let prevNav = null;
+    let nextNav = null;
+
+    const modNum = moduleDoc?.moduleNumber || 1;
+    const isHomework = lessonSlug === `module-${modNum}-homework`;
+    const isQuiz = lessonSlug === `module-${modNum}-coding-quiz`;
+
+    if (isHomework) {
+      const lesson8 = allModuleLessons.find((l) => l.lessonNumber === 8);
+      const lesson9 = allModuleLessons.find((l) => l.lessonNumber === 9);
+      if (lesson8) prevNav = { title: `Lesson 8: ${lesson8.title}`, slug: lesson8.slug, lessonNumber: 8 };
+      if (lesson9) nextNav = { title: `Lesson 9: ${lesson9.title}`, slug: lesson9.slug, lessonNumber: 9, locked: !hwPassed };
+    } else if (isQuiz) {
+      const lastL = allModuleLessons[allModuleLessons.length - 1];
+      if (lastL) prevNav = { title: `Lesson ${lastL.lessonNumber}: ${lastL.title}`, slug: lastL.slug, lessonNumber: lastL.lessonNumber };
+      nextNav = null;
+    } else {
+      const currentIndex = allModuleLessons.findIndex((l) => String(l._id) === String(lesson._id));
+      const curL = currentIndex >= 0 ? allModuleLessons[currentIndex] : null;
+
+      if (curL && curL.lessonNumber === 8 && (modNum === 2 || modNum === 3)) {
+        prevNav = currentIndex > 0 ? { title: allModuleLessons[currentIndex - 1].title, slug: allModuleLessons[currentIndex - 1].slug, lessonNumber: allModuleLessons[currentIndex - 1].lessonNumber } : null;
+        nextNav = {
+          title: `Module ${modNum} Official Homework (Graded)`,
+          slug: `module-${modNum}-homework`,
+          isAssessment: true,
+          locked: !isCompleted
+        };
+      } else if (curL && curL.lessonNumber === 9 && (modNum === 2 || modNum === 3)) {
+        prevNav = {
+          title: `Module ${modNum} Official Homework (Graded)`,
+          slug: `module-${modNum}-homework`,
+          isAssessment: true
+        };
+        const nextL = allModuleLessons.find((l) => l.lessonNumber === 10);
+        nextNav = nextL ? { title: nextL.title, slug: nextL.slug, lessonNumber: 10, locked: !isCompleted } : null;
+      } else if (curL && curL.lessonNumber === 10 && (modNum === 2 || modNum === 3)) {
+        const prevL = allModuleLessons.find((l) => l.lessonNumber === 9);
+        prevNav = prevL ? { title: prevL.title, slug: prevL.slug, lessonNumber: 9 } : null;
+        nextNav = {
+          title: `Module ${modNum} Final Coding Quiz (Graded)`,
+          slug: `module-${modNum}-coding-quiz`,
+          isAssessment: true,
+          locked: !isCompleted || !hwPassed
+        };
+      } else {
+        prevNav = currentIndex > 0 ? { title: allModuleLessons[currentIndex - 1].title, slug: allModuleLessons[currentIndex - 1].slug, lessonNumber: allModuleLessons[currentIndex - 1].lessonNumber } : null;
+        nextNav = currentIndex >= 0 && currentIndex < allModuleLessons.length - 1 ? { title: allModuleLessons[currentIndex + 1].title, slug: allModuleLessons[currentIndex + 1].slug, lessonNumber: allModuleLessons[currentIndex + 1].lessonNumber, locked: !isCompleted } : null;
+      }
     }
 
     res.json({

@@ -27,6 +27,8 @@ export default function AssessmentWorksheet({
   const [assessmentData, setAssessmentData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockDetails, setLockDetails] = useState(null);
 
   // Student code per question
   const [studentCode, setStudentCode] = useState({});
@@ -45,12 +47,24 @@ export default function AssessmentWorksheet({
     async function fetchAssessment() {
       setLoading(true);
       setError(null);
+      setIsLocked(false);
+      setLockDetails(null);
       const token = localStorage.getItem('access_token');
 
       try {
         const res = await fetch(`/api/courses/${courseSlug}/assessments/${assessmentType}?module=${targetMod}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
+
+        if (res.status === 403) {
+          const lockData = await res.json();
+          if (isMounted) {
+            setIsLocked(true);
+            setLockDetails(lockData);
+            setLoading(false);
+          }
+          return;
+        }
 
         if (!res.ok) {
           throw new Error('Failed to load assessment details.');
@@ -246,6 +260,53 @@ export default function AssessmentWorksheet({
       <div className="worksheet-loading">
         <div className="jupyter-spinner" />
         <p>Loading assessment worksheet...</p>
+      </div>
+    );
+  }
+
+  if (isLocked) {
+    return (
+      <div className="worksheet-locked-container" style={{ padding: '3.5rem 1.5rem', maxWidth: '720px', margin: '2rem auto', textAlign: 'center', background: '#FFFFFF', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: '3.2rem', marginBottom: '1rem' }}>🔒</div>
+        <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-brand)', marginBottom: '0.75rem' }}>
+          {lockDetails?.reason === 'homework_required'
+            ? 'Homework Completion Required'
+            : lockDetails?.reason === 'previous_lesson_incomplete'
+            ? 'Previous Lesson Incomplete'
+            : 'Assessment Locked'}
+        </h2>
+        <p style={{ color: '#475569', fontSize: '1.05rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+          {lockDetails?.detail || 'You must complete earlier required content before accessing this assessment.'}
+        </p>
+        {lockDetails?.requiredLesson && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <a
+              href={`/learn/${courseSlug}/module/${targetMod}/lesson/${lockDetails.requiredLesson.slug}`}
+              className="btn btn-primary"
+            >
+              Go to Lesson {lockDetails.requiredLesson.lessonNumber}: {lockDetails.requiredLesson.title} →
+            </a>
+          </div>
+        )}
+        {lockDetails?.requiredHomework && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <a
+              href={`/learn/${courseSlug}/module/${targetMod}/lesson/${lockDetails.requiredHomework.slug}`}
+              className="btn btn-primary"
+            >
+              Go to Module {targetMod} Homework →
+            </a>
+          </div>
+        )}
+        <div style={{ marginTop: '1rem' }}>
+          <a
+            href={`/learn/${courseSlug}/module/${targetMod}`}
+            className="btn btn-outline"
+            style={{ marginLeft: '0.5rem' }}
+          >
+            ← Back to Module Overview
+          </a>
+        </div>
       </div>
     );
   }

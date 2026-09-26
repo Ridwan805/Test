@@ -5236,8 +5236,65 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ==========================================================================
+   Lesson & Assessment Gating Progression Styles
+   ========================================================================== */
 
+.dashboard-lesson-card.lesson-card-locked {
+  background: #FAF8F5;
+  border-color: #E2E8F0;
+  opacity: 0.88;
+}
 
+.dashboard-lesson-card.lesson-card-locked:hover {
+  border-color: #CBD5E1;
+  background: #F8FAFC;
+  transform: none;
+}
 
+.lesson-card-num.num-locked {
+  background: #F1F5F9;
+  color: #64748B;
+  border: 1px solid #CBD5E1;
+}
 
+.lesson-state-pill.state-locked {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
 
+.assessment-stat-card.assessment-card-locked {
+  background: #FAFAF9;
+  border-color: #E2E8F0;
+}
+
+.sidebar-lesson-item.locked {
+  color: #64748B;
+}
+
+.sidebar-lesson-item.locked:hover {
+  background: #F8FAFC;
+}
+
+.sidebar-assessment-item.locked {
+  border-color: #E2E8F0;
+  background: #F8FAFC;
+  opacity: 0.85;
+}
+
+.nav-link-card.next.nav-locked {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+}
+
+.nav-link-card.next.nav-locked .nav-arrow {
+  color: #D97706;
+}
+
+.lesson-locked-screen {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
