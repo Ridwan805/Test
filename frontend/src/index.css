@@ -2885,9 +2885,17 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   background-color: #162235;
-  padding: 0.5rem 1rem;
+  padding: 0.45rem 0.85rem;
   border-bottom: 1px solid #23354E;
+}
+
+.code-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .code-lang {
@@ -2898,13 +2906,101 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.08em;
 }
 
+.code-interactive-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.code-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.code-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #059669;
+  border: 1px solid #10B981;
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.35);
+  transition: all 0.15s ease;
+}
+
+.code-run-btn:hover:not(:disabled) {
+  background: #047857;
+  border-color: #34D399;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.45);
+}
+
+.code-run-btn.running {
+  background: #064E3B;
+  border-color: #047857;
+  cursor: wait;
+}
+
+.code-run-btn .play-triangle {
+  font-size: 0.65rem;
+  color: #A7F3D0;
+}
+
+.code-action-btn {
+  background: #1E293B;
+  border: 1px solid #334155;
+  color: #CBD5E1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.code-action-btn:hover {
+  background: #334155;
+  color: #F8FAFC;
+}
+
+.code-action-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38BDF8;
+  color: #38BDF8;
+}
+
+.code-reset-btn {
+  border-color: #E2E8F0;
+  color: #F87171;
+}
+
+.code-reset-btn:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: #FCA5A5;
+}
+
 .code-copy-btn {
   background: transparent;
   border: 1px solid #334155;
   color: #CBD5E1;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 0.25rem 0.65rem;
+  padding: 0.25rem 0.6rem;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -2913,6 +3009,141 @@ h1, h2, h3, h4, h5, h6 {
 .code-copy-btn:hover {
   background: #202F46;
   color: #FFFFFF;
+}
+
+.code-editor-container {
+  background-color: #0B111A;
+  padding: 0.5rem 0.75rem;
+}
+
+.code-editor-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #F1F5F9;
+  font-family: 'IBM Plex Mono', Consolas, Monaco, monospace;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  tab-size: 4;
+}
+
+.code-editor-textarea:focus {
+  outline: none;
+}
+
+.code-live-terminal {
+  background-color: #060B14;
+  border-top: 1px solid #1E293B;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.live-terminal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #0B1320;
+  padding: 0.35rem 0.85rem;
+  border-bottom: 1px solid #19273A;
+}
+
+.live-terminal-dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.terminal-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-red { background-color: #EF4444; }
+.dot-yellow { background-color: #F59E0B; }
+.dot-green { background-color: #10B981; }
+
+.live-terminal-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #38BDF8;
+}
+
+.live-terminal-dismiss {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.live-terminal-dismiss:hover {
+  background: #1E293B;
+  color: #F8FAFC;
+}
+
+.live-terminal-viewport {
+  padding: 0.85rem 1.25rem;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.live-terminal-out-content {
+  margin: 0;
+  font-family: 'IBM Plex Mono', Consolas, Monaco, monospace;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #34D399;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.live-terminal-err-content {
+  margin: 0;
+  font-family: 'IBM Plex Mono', Consolas, Monaco, monospace;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #F87171;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.live-terminal-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: #94A3B8;
+  padding: 0.5rem 0;
+}
+
+.live-spinner-icon {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: liveSpin 0.7s linear infinite;
+  display: inline-block;
+}
+
+.live-spinner-icon.big {
+  width: 16px;
+  height: 16px;
+  border-color: rgba(56, 189, 248, 0.25);
+  border-top-color: #38BDF8;
+}
+
+@keyframes liveSpin {
+  to { transform: rotate(360deg); }
 }
 
 .code-pre {
@@ -4147,47 +4378,90 @@ h1, h2, h3, h4, h5, h6 {
   flex-wrap: wrap;
 }
 
-/* Module 3 Locked State Box */
-.module-locked-notice {
+/* Module Locked Full Page Card */
+.module-locked-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1.75rem;
-  background: #F8FAFC;
-  border: 1px dashed #CBD5E1;
-  border-radius: 8px;
-  padding: 2.25rem 2rem;
-  margin-top: 1.5rem;
+  text-align: center;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 3.5rem 2.5rem;
+  box-shadow: 0 10px 30px rgba(11, 25, 44, 0.06);
+  width: 100%;
 }
 
-.locked-icon-wrapper {
-  font-size: 2.5rem;
-  background: #EDE9FE;
-  width: 64px;
-  height: 64px;
+.locked-badge-circle {
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  border: 2px solid #FCD34D;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 16px rgba(221, 168, 83, 0.2);
 }
 
-.locked-text-wrapper h3 {
+.locked-card-title {
   font-family: var(--font-heading);
-  font-size: 1.2rem;
+  font-size: 2rem;
   color: var(--color-brand);
-  margin: 0 0 0.35rem 0;
+  margin: 0 0 0.75rem 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.locked-text-wrapper p {
-  font-size: 0.92rem;
-  color: #64748B;
-  margin-bottom: 1rem;
+.locked-card-desc {
+  color: #475569;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  max-width: 520px;
+  margin: 0 0 1.75rem 0;
 }
 
-.locked-cta-row {
+.locked-grade-pill {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 9999px;
+  padding: 0.75rem 1.75rem;
+  margin-bottom: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.98rem;
+  color: #92400E;
+  box-shadow: 0 2px 6px rgba(221, 168, 83, 0.08);
+}
+
+.locked-grade-pill strong {
+  color: #78350F;
+}
+
+.locked-actions-group {
   display: flex;
-  gap: 0.75rem;
+  gap: 1rem;
+  justify-content: center;
   flex-wrap: wrap;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .module-locked-card {
+    padding: 2.5rem 1.5rem;
+  }
+  .locked-card-title {
+    font-size: 1.6rem;
+  }
+  .locked-actions-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  .locked-actions-group .btn {
+    width: 100%;
+  }
 }
 
 /* Module 2 Top Quick Tools Banner */
@@ -4343,6 +4617,175 @@ h1, h2, h3, h4, h5, h6 {
 .btn-open-notebook-tab:hover {
   background: #F1F5F9;
   border-color: var(--color-brand);
+}
+
+/* ==========================================================================
+   Integrated Jupyter Notebook Homework Workspace Styles
+   ========================================================================== */
+.homework-integrated-header {
+  border-left: 4px solid #10B981;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+}
+
+.header-action-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.homework-eval-main-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.eval-main-text {
+  flex: 1 1 540px;
+}
+
+.eval-main-btn-col {
+  flex: 0 0 auto;
+}
+
+.btn-submit-notebook-top {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.6rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: 1px solid #10B981;
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-submit-notebook-top:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.45);
+}
+
+.integrated-jupyter-workspace-wrapper {
+  margin: 1.5rem 0 3rem 0;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(16, 24, 38, 0.06);
+  overflow: hidden;
+}
+
+.jupyter-workspace-meta-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0F172A;
+  color: #F8FAFC;
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid #1E293B;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.meta-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.meta-banner-dot {
+  width: 8px;
+  height: 8px;
+  background: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10B981;
+  display: inline-block;
+}
+
+.meta-banner-text {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: #CBD5E1;
+}
+
+.meta-banner-text strong {
+  color: #38BDF8;
+}
+
+.meta-tip {
+  font-size: 0.78rem;
+  color: #94A3B8;
+}
+
+.meta-tip strong {
+  color: #FDE68A;
+}
+
+.integrated-jupyter-frame-container {
+  width: 100%;
+  height: 820px;
+  background: #F8FAFC;
+  position: relative;
+}
+
+.integrated-homework-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.notebook-bottom-submit-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #F8FAFC;
+  border-top: 1px solid #E2E8F0;
+  padding: 1.25rem 1.5rem;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+.bottom-submit-info h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.05rem;
+  color: var(--color-brand);
+}
+
+.bottom-submit-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748B;
+}
+
+.btn-submit-notebook-bottom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: 1px solid #10B981;
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-submit-notebook-bottom:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+  transform: translateY(-1px);
 }
 
 .worksheet-title {

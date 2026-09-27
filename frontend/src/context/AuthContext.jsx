@@ -3,8 +3,15 @@ import React, { createContext, useState, useEffect } from 'react';
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Helper to sync user state with localStorage for JupyterLite and global permissions
@@ -13,38 +20,75 @@ export const AuthProvider = ({ children }) => {
     if (userData) {
       localStorage.setItem('user_is_staff', Boolean(userData.is_staff).toString());
       localStorage.setItem('user_email', userData.email || '');
+      localStorage.setItem('cached_user', JSON.stringify(userData));
     } else {
       localStorage.removeItem('user_is_staff');
       localStorage.removeItem('user_email');
+      localStorage.removeItem('cached_user');
     }
   };
 
-  // Check if user is logged in on mount
+  // Helper to silently refresh expired access token using refresh token
+  const tryRefreshToken = async () => {
+    const refresh = localStorage.getItem('refresh_token');
+    if (!refresh) return null;
+    try {
+      const res = await fetch('/api/auth/token/refresh/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.access) {
+          localStorage.setItem('access_token', data.access);
+          if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
+          return data.access;
+        }
+      }
+    } catch (e) {
+      // Network/offline error — preserve current session
+    }
+    return null;
+  };
+
+  // Verify and sync user profile on mount without auto-logging out on network errors
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem('access_token');
+      let token = localStorage.getItem('access_token');
       if (token) {
         try {
-          const res = await fetch('/api/auth/me/', {
+          let res = await fetch('/api/auth/me/', {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
           });
+
+          // If token returned 401, attempt silent background refresh
+          if (res.status === 401) {
+            const newToken = await tryRefreshToken();
+            if (newToken) {
+              token = newToken;
+              res = await fetch('/api/auth/me/', {
+                headers: {
+                  'Authorization': `Bearer ${newToken}`,
+                },
+              });
+            }
+          }
+
           if (res.ok) {
             const data = await res.json();
+            if (data.access) localStorage.setItem('access_token', data.access);
+            if (data.refresh) localStorage.setItem('refresh_token', data.refresh);
             syncUserState(data);
           } else {
-            // Token might be expired
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            syncUserState(null);
+            console.warn("Auth sync responded with status:", res.status, "- maintaining persistent user session.");
           }
         } catch (err) {
-          console.error("Failed to fetch user profile", err);
-          syncUserState(null);
+          // Network error or server restarting — KEEP the user logged in using cached state!
+          console.warn("Network hiccup during profile sync, retaining persistent session:", err.message);
         }
-      } else {
-        syncUserState(null);
       }
       setLoading(false);
     };

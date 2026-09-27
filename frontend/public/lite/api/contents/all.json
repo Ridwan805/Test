@@ -97,6 +97,48 @@
       "size": 7331,
       "type": "notebook",
       "writable": false
+    },
+    {
+      "content": null,
+      "created": "2026-09-27T07:30:00.000000Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-09-27T07:30:00.000000Z",
+      "mimetype": null,
+      "name": "module-4-practice.ipynb",
+      "path": "module-4-practice.ipynb",
+      "size": 7009,
+      "type": "notebook",
+      "writable": false
+    },
+    {
+      "content": null,
+      "created": "2026-09-27T07:30:00.000000Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-09-27T07:30:00.000000Z",
+      "mimetype": null,
+      "name": "module-4-homework.ipynb",
+      "path": "module-4-homework.ipynb",
+      "size": 8032,
+      "type": "notebook",
+      "writable": false
+    },
+    {
+      "content": null,
+      "created": "2026-09-27T07:30:00.000000Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-09-27T07:30:00.000000Z",
+      "mimetype": null,
+      "name": "module-4-coding-quiz.ipynb",
+      "path": "module-4-coding-quiz.ipynb",
+      "size": 6125,
+      "type": "notebook",
+      "writable": false
     }
   ],
   "created": "2026-09-26T09:26:14.274340Z",

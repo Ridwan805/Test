@@ -1921,3 +1921,1004 @@ ${code}
 
   return results;
 }
+
+/**
+ * Automated Grader for Module 4 Homework (8 Tasks: H1 - H8, 40 Marks Total)
+ */
+export async function gradeModule4Homework(codeMap) {
+  const py = await getPyodide();
+  const results = [];
+
+  const toPlain = (val) => {
+    if (val instanceof Map) {
+      const obj = {};
+      for (const [k, v] of val.entries()) {
+        obj[k] = toPlain(v);
+      }
+      return obj;
+    }
+    if (Array.isArray(val)) {
+      return val.map(toPlain);
+    }
+    return val;
+  };
+
+  const getVar = (varName) => {
+    try {
+      const v = py.globals.get(varName);
+      if (v && typeof v.toJs === 'function') {
+        return toPlain(v.toJs({ dict_converter: Object.fromEntries }));
+      }
+      return toPlain(v);
+    } catch (e) {
+      return undefined;
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // H1 (Task 4.2): Deduplicate List Without Helper Functions (5 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h1'] || '';
+    const checks = [];
+    let marks = 0;
+
+    const noForbidden = !/\bset\s*\(/.test(code) && !/\.remove\s*\(/.test(code);
+    checks.push({
+      name: 'Does not use set() or convenience removal helpers',
+      passed: noForbidden,
+      message: noForbidden ? 'Passed' : 'Avoid using set() or direct convenience functions'
+    });
+    if (noForbidden) marks += 1;
+
+    // Test Case 1: Source list
+    await py.runPythonAsync(`
+numbers = [10, 56, 36, 87, 66, 99, 21, 96, 56, 67, 98, 66, 21, 87, 10, 98]
+result_list = []
+${code}
+if 'result_list' not in locals() and 'l1' in locals():
+    result_list = l1
+`);
+    const r1 = getVar('result_list') || [];
+    const expected1 = [10, 56, 36, 87, 66, 99, 21, 96, 67, 98];
+    const pass1 = JSON.stringify(r1) === JSON.stringify(expected1);
+    checks.push({
+      name: 'Correctly deduplicates source example preserving order',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected [${expected1.join(', ')}], got [${(r1 || []).join(', ')}]`
+    });
+    if (pass1) marks += 2;
+
+    // Test Case 2: General test list
+    await py.runPythonAsync(`
+numbers = [1, 2, 2, 3, 1, 4, 3, 5]
+result_list = []
+${code}
+if 'result_list' not in locals() and 'l1' in locals():
+    result_list = l1
+`);
+    const r2 = getVar('result_list') || [];
+    const expected2 = [1, 2, 3, 4, 5];
+    const pass2 = JSON.stringify(r2) === JSON.stringify(expected2);
+    checks.push({
+      name: 'Correctly deduplicates alternate test list [1, 2, 2, 3, 1, 4, 3, 5]',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Expected [${expected2.join(', ')}], got [${(r2 || []).join(', ')}]`
+    });
+    if (pass2) marks += 2;
+
+    results.push({
+      questionId: 'hw-h1',
+      title: 'H1 (Task 4.2): Deduplicate List Without Helper Functions',
+      earnedPoints: marks,
+      maxPoints: 5,
+      passed: marks === 5,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h1',
+      title: 'H1 (Task 4.2): Deduplicate List Without Helper Functions',
+      earnedPoints: 0,
+      maxPoints: 5,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // H2 (Task 4.7): Filter Numbers Greater Than 10 (4 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h2'] || '';
+    const checks = [];
+    let marks = 0;
+
+    // Test Case 1
+    await py.runPythonAsync(`
+input_numbers = [4, 12, 7, 25, 9, 10, 31, 2]
+greater_than_10 = []
+${code}
+`);
+    const r1 = getVar('greater_than_10') || [];
+    const expected1 = [12, 25, 31];
+    const pass1 = JSON.stringify(r1) === JSON.stringify(expected1);
+    checks.push({
+      name: 'Filters elements > 10 from [4, 12, 7, 25, 9, 10, 31, 2]',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected [${expected1.join(', ')}], got [${(r1 || []).join(', ')}]`
+    });
+    if (pass1) marks += 2;
+
+    // Test Case 2
+    await py.runPythonAsync(`
+input_numbers = [1, 10, 11, 5, 20, 100]
+greater_than_10 = []
+${code}
+`);
+    const r2 = getVar('greater_than_10') || [];
+    const expected2 = [11, 20, 100];
+    const pass2 = JSON.stringify(r2) === JSON.stringify(expected2);
+    checks.push({
+      name: 'Filters elements > 10 from [1, 10, 11, 5, 20, 100]',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Expected [${expected2.join(', ')}], got [${(r2 || []).join(', ')}]`
+    });
+    if (pass2) marks += 1;
+
+    // Test Case 3: Empty edge case
+    await py.runPythonAsync(`
+input_numbers = [3, 5, 8, 10]
+greater_than_10 = []
+${code}
+`);
+    const r3 = getVar('greater_than_10') || [];
+    const pass3 = Array.isArray(r3) && r3.length === 0;
+    checks.push({
+      name: 'Returns empty list when no numbers exceed 10',
+      passed: pass3,
+      message: pass3 ? 'Passed' : `Expected empty list [], got [${(r3 || []).join(', ')}]`
+    });
+    if (pass3) marks += 1;
+
+    results.push({
+      questionId: 'hw-h2',
+      title: 'H2 (Task 4.7): Filter Numbers Greater Than 10',
+      earnedPoints: marks,
+      maxPoints: 4,
+      passed: marks === 4,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h2',
+      title: 'H2 (Task 4.7): Filter Numbers Greater Than 10',
+      earnedPoints: 0,
+      maxPoints: 4,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // H3 (Task 4.8): Flatten Nested List with List Comprehension (5 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h3'] || '';
+    const checks = [];
+    let marks = 0;
+
+    const usesListComp = /\[.*for\s+\w+\s+in\s+.*for\s+\w+\s+in\s+.*\]/s.test(code) || (/\[.*for\s+/s.test(code) && /for\s+/s.test(code));
+    checks.push({
+      name: 'Uses list comprehension syntax',
+      passed: usesListComp,
+      message: usesListComp ? 'Passed' : 'Construct must use list comprehension [item for sub in ... for item in sub]'
+    });
+    if (usesListComp) marks += 2;
+
+    // Test Case 1: Source 2D list
+    await py.runPythonAsync(`
+nested_list = [[1, 2, 3, 4], [5, 6, 7, 8]]
+flat_list = []
+${code}
+if 'flat_list' not in locals() and 'l2' in locals():
+    flat_list = l2
+`);
+    const r1 = getVar('flat_list') || [];
+    const expected1 = [1, 2, 3, 4, 5, 6, 7, 8];
+    const pass1 = JSON.stringify(r1) === JSON.stringify(expected1);
+    checks.push({
+      name: 'Flattens [[1, 2, 3, 4], [5, 6, 7, 8]] into 1D list',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected [${expected1.join(', ')}], got [${(r1 || []).join(', ')}]`
+    });
+    if (pass1) marks += 2;
+
+    // Test Case 2: Unequal sublists
+    await py.runPythonAsync(`
+nested_list = [[10, 20], [30, 40, 50], [60]]
+flat_list = []
+${code}
+if 'flat_list' not in locals() and 'l2' in locals():
+    flat_list = l2
+`);
+    const r2 = getVar('flat_list') || [];
+    const expected2 = [10, 20, 30, 40, 50, 60];
+    const pass2 = JSON.stringify(r2) === JSON.stringify(expected2);
+    checks.push({
+      name: 'Flattens varying-length nested list correctly',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Expected [${expected2.join(', ')}], got [${(r2 || []).join(', ')}]`
+    });
+    if (pass2) marks += 1;
+
+    results.push({
+      questionId: 'hw-h3',
+      title: 'H3 (Task 4.8): Flatten Nested List with List Comprehension',
+      earnedPoints: marks,
+      maxPoints: 5,
+      passed: marks === 5,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h3',
+      title: 'H3 (Task 4.8): Flatten Nested List with List Comprehension',
+      earnedPoints: 0,
+      maxPoints: 5,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // H4 (Task 4.9): Shift List Elements Right by N Positions (6 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h4'] || '';
+    const checks = [];
+    let marks = 0;
+
+    // Test Case 1: Source example [1, 2, 3, 4], n = 2
+    await py.runPythonAsync(`
+original_list = [1, 2, 3, 4]
+n = 2
+rotated_list = []
+${code}
+if 'rotated_list' not in locals() or not rotated_list:
+    if 'output' in locals(): rotated_list = output
+    elif 'ans' in locals(): rotated_list = ans
+`);
+    const r1 = getVar('rotated_list') || [];
+    const expected1 = [3, 4, 1, 2];
+    const pass1 = JSON.stringify(r1) === JSON.stringify(expected1);
+    checks.push({
+      name: 'Shifts [1, 2, 3, 4] right by 2 -> [3, 4, 1, 2]',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected [${expected1.join(', ')}], got [${(r1 || []).join(', ')}]`
+    });
+    if (pass1) marks += 2;
+
+    // Test Case 2: ['a', 'b', 'c', 'd', 'e'], n = 1
+    await py.runPythonAsync(`
+original_list = ['a', 'b', 'c', 'd', 'e']
+n = 1
+rotated_list = []
+${code}
+if 'rotated_list' not in locals() or not rotated_list:
+    if 'output' in locals(): rotated_list = output
+    elif 'ans' in locals(): rotated_list = ans
+`);
+    const r2 = getVar('rotated_list') || [];
+    const expected2 = ['e', 'a', 'b', 'c', 'd'];
+    const pass2 = JSON.stringify(r2) === JSON.stringify(expected2);
+    checks.push({
+      name: 'Shifts [a, b, c, d, e] right by 1 -> [e, a, b, c, d]',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Expected [${expected2.join(', ')}], got [${(r2 || []).join(', ')}]`
+    });
+    if (pass2) marks += 2;
+
+    // Test Case 3: [10, 20, 30], n = 3 (full rotation)
+    await py.runPythonAsync(`
+original_list = [10, 20, 30]
+n = 3
+rotated_list = []
+${code}
+if 'rotated_list' not in locals() or not rotated_list:
+    if 'output' in locals(): rotated_list = output
+    elif 'ans' in locals(): rotated_list = ans
+`);
+    const r3 = getVar('rotated_list') || [];
+    const expected3 = [10, 20, 30];
+    const pass3 = JSON.stringify(r3) === JSON.stringify(expected3);
+    checks.push({
+      name: 'Shifts [10, 20, 30] right by 3 -> [10, 20, 30]',
+      passed: pass3,
+      message: pass3 ? 'Passed' : `Expected [${expected3.join(', ')}], got [${(r3 || []).join(', ')}]`
+    });
+    if (pass3) marks += 2;
+
+    results.push({
+      questionId: 'hw-h4',
+      title: 'H4 (Task 4.9): Shift List Elements Right by N Positions',
+      earnedPoints: marks,
+      maxPoints: 6,
+      passed: marks === 6,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h4',
+      title: 'H4 (Task 4.9): Shift List Elements Right by N Positions',
+      earnedPoints: 0,
+      maxPoints: 6,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // H5 (Task 4.10): Count Frequency of List Elements (5 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h5'] || '';
+    const checks = [];
+    let marks = 0;
+
+    // Test Case 1: [1, 2, 2, 3, 3, 3]
+    await py.runPythonAsync(`
+data_list = [1, 2, 2, 3, 3, 3]
+frequency_counts = {}
+${code}
+if 'frequency_counts' not in locals() or not frequency_counts:
+    if 'freq' in locals(): frequency_counts = freq
+    elif 'counts' in locals(): frequency_counts = counts
+`);
+    const r1 = getVar('frequency_counts') || {};
+    const pass1 = (r1[1] === 1 || r1['1'] === 1) &&
+                  (r1[2] === 2 || r1['2'] === 2) &&
+                  (r1[3] === 3 || r1['3'] === 3);
+    checks.push({
+      name: 'Counts frequency of [1, 2, 2, 3, 3, 3]',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected {1: 1, 2: 2, 3: 3}, got ${JSON.stringify(r1)}`
+    });
+    if (pass1) marks += 3;
+
+    // Test Case 2: String list
+    await py.runPythonAsync(`
+data_list = ['apple', 'banana', 'apple', 'cherry', 'banana', 'banana']
+frequency_counts = {}
+${code}
+if 'frequency_counts' not in locals() or not frequency_counts:
+    if 'freq' in locals(): frequency_counts = freq
+    elif 'counts' in locals(): frequency_counts = counts
+`);
+    const r2 = getVar('frequency_counts') || {};
+    const pass2 = r2['apple'] === 2 && r2['banana'] === 3 && r2['cherry'] === 1;
+    checks.push({
+      name: 'Counts frequency of fruit words correctly',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Expected {'apple': 2, 'banana': 3, 'cherry': 1}, got ${JSON.stringify(r2)}`
+    });
+    if (pass2) marks += 2;
+
+    results.push({
+      questionId: 'hw-h5',
+      title: 'H5 (Task 4.10): Count Frequency of List Elements',
+      earnedPoints: marks,
+      maxPoints: 5,
+      passed: marks === 5,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h5',
+      title: 'H5 (Task 4.10): Count Frequency of List Elements',
+      earnedPoints: 0,
+      maxPoints: 5,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // H6 (Task 4.12): Find Second Largest Number (5 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h6'] || '';
+    const checks = [];
+    let marks = 0;
+
+    // Test Case 1: Source example [12, 35, 1, 10, 34, 1] -> 34
+    await py.runPythonAsync(`
+num_list = [12, 35, 1, 10, 34, 1]
+second_largest = None
+${code}
+`);
+    const r1 = getVar('second_largest');
+    const pass1 = Number(r1) === 34;
+    checks.push({
+      name: 'Finds second largest in [12, 35, 1, 10, 34, 1] -> 34',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected 34, got ${r1}`
+    });
+    if (pass1) marks += 3;
+
+    // Test Case 2: Duplicates handling
+    await py.runPythonAsync(`
+num_list = [100, 45, 88, 92, 100, 95]
+second_largest = None
+${code}
+`);
+    const r2 = getVar('second_largest');
+    // Either distinct 2nd largest (95) or sorted 2nd index (100)
+    const pass2 = Number(r2) === 95 || Number(r2) === 100;
+    checks.push({
+      name: 'Handles lists with duplicate top values',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Expected 95 or 100, got ${r2}`
+    });
+    if (pass2) marks += 1;
+
+    // Test Case 3: Simple 3 elements
+    await py.runPythonAsync(`
+num_list = [5, 20, 15]
+second_largest = None
+${code}
+`);
+    const r3 = getVar('second_largest');
+    const pass3 = Number(r3) === 15;
+    checks.push({
+      name: 'Finds second largest in [5, 20, 15] -> 15',
+      passed: pass3,
+      message: pass3 ? 'Passed' : `Expected 15, got ${r3}`
+    });
+    if (pass3) marks += 1;
+
+    results.push({
+      questionId: 'hw-h6',
+      title: 'H6 (Task 4.12): Find Second Largest Number',
+      earnedPoints: marks,
+      maxPoints: 5,
+      passed: marks === 5,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h6',
+      title: 'H6 (Task 4.12): Find Second Largest Number',
+      earnedPoints: 0,
+      maxPoints: 5,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // H7 (Task 4.16): Character Frequency Dictionary (5 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h7'] || '';
+    const checks = [];
+    let marks = 0;
+
+    // Test Case 1: "Hello World"
+    await py.runPythonAsync(`
+raw_string = "Hello World"
+char_freq = {}
+${code}
+`);
+    const r1 = getVar('char_freq') || {};
+    const expected1 = { 'h': 1, 'e': 1, 'l': 3, 'o': 2, 'w': 1, 'r': 1, 'd': 1 };
+    const pass1 = Object.keys(expected1).every((k) => r1[k] === expected1[k]) && !r1[' '];
+    checks.push({
+      name: 'Calculates char frequency for "Hello World" excluding spaces',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected ${JSON.stringify(expected1)}, got ${JSON.stringify(r1)}`
+    });
+    if (pass1) marks += 3;
+
+    // Test Case 2: "Data Structures"
+    await py.runPythonAsync(`
+raw_string = "Data Structures"
+char_freq = {}
+${code}
+`);
+    const r2 = getVar('char_freq') || {};
+    const pass2 = r2['d'] === 1 && r2['a'] === 2 && r2['t'] === 3 && r2['s'] === 2 && !r2[' '];
+    checks.push({
+      name: 'Calculates char frequency for "Data Structures" (case-insensitive, no spaces)',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Incorrect frequency counts for 'Data Structures': ${JSON.stringify(r2)}`
+    });
+    if (pass2) marks += 2;
+
+    results.push({
+      questionId: 'hw-h7',
+      title: 'H7 (Task 4.16): Character Frequency Dictionary',
+      earnedPoints: marks,
+      maxPoints: 5,
+      passed: marks === 5,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h7',
+      title: 'H7 (Task 4.16): Character Frequency Dictionary',
+      earnedPoints: 0,
+      maxPoints: 5,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // H8 (Task 4.17): Dictionary of Squares 1 to N (5 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['hw-h8'] || '';
+    const checks = [];
+    let marks = 0;
+
+    // Test Case 1: n = 3 -> {1: 1, 2: 4, 3: 9}
+    await py.runPythonAsync(`
+n = 3
+squares_dict = {}
+${code}
+`);
+    const r1 = getVar('squares_dict') || {};
+    const pass1 = (r1[1] === 1 || r1['1'] === 1) &&
+                  (r1[2] === 4 || r1['2'] === 4) &&
+                  (r1[3] === 9 || r1['3'] === 9);
+    checks.push({
+      name: 'Generates {1: 1, 2: 4, 3: 9} for n = 3',
+      passed: pass1,
+      message: pass1 ? 'Passed' : `Expected {1: 1, 2: 4, 3: 9}, got ${JSON.stringify(r1)}`
+    });
+    if (pass1) marks += 2;
+
+    // Test Case 2: n = 5
+    await py.runPythonAsync(`
+n = 5
+squares_dict = {}
+${code}
+`);
+    const r2 = getVar('squares_dict') || {};
+    const pass2 = (r2[4] === 16 || r2['4'] === 16) && (r2[5] === 25 || r2['5'] === 25);
+    checks.push({
+      name: 'Correctly scales to n = 5 ({..., 4: 16, 5: 25})',
+      passed: pass2,
+      message: pass2 ? 'Passed' : `Expected entries for 4 and 5, got ${JSON.stringify(r2)}`
+    });
+    if (pass2) marks += 2;
+
+    // Test Case 3: n = 1
+    await py.runPythonAsync(`
+n = 1
+squares_dict = {}
+${code}
+`);
+    const r3 = getVar('squares_dict') || {};
+    const pass3 = (r3[1] === 1 || r3['1'] === 1) && Object.keys(r3).length === 1;
+    checks.push({
+      name: 'Base case n = 1 generates {1: 1}',
+      passed: pass3,
+      message: pass3 ? 'Passed' : `Expected {1: 1}, got ${JSON.stringify(r3)}`
+    });
+    if (pass3) marks += 1;
+
+    results.push({
+      questionId: 'hw-h8',
+      title: 'H8 (Task 4.17): Dictionary of Squares 1 to N',
+      earnedPoints: marks,
+      maxPoints: 5,
+      passed: marks === 5,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'hw-h8',
+      title: 'H8 (Task 4.17): Dictionary of Squares 1 to N',
+      earnedPoints: 0,
+      maxPoints: 5,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Automated Grader for Module 4 Coding Quiz (6 Questions: Q1 - Q6, 20 Marks Total)
+ */
+export async function gradeModule4Quiz(codeMap) {
+  const py = await getPyodide();
+  const results = [];
+
+  const toPlain = (val) => {
+    if (val instanceof Map) {
+      const obj = {};
+      for (const [k, v] of val.entries()) {
+        obj[k] = toPlain(v);
+      }
+      return obj;
+    }
+    if (Array.isArray(val)) {
+      return val.map(toPlain);
+    }
+    return val;
+  };
+
+  const getVar = (varName) => {
+    try {
+      const v = py.globals.get(varName);
+      if (v && typeof v.toJs === 'function') {
+        return toPlain(v.toJs({ dict_converter: Object.fromEntries }));
+      }
+      return toPlain(v);
+    } catch (e) {
+      return undefined;
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Question 1: List Operations (3 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['quiz-q1'] || '';
+    const checks = [];
+    let marks = 0;
+
+    await py.runPythonAsync(`
+inventory = ["pen", "book", "eraser", "pencil"]
+updated_inventory = None
+${code}
+if updated_inventory is None and 'inventory' in locals():
+    updated_inventory = inventory
+`);
+    const inv = getVar('updated_inventory') || [];
+    const expected = ["notebook", "book", "marker", "pencil", "ruler"];
+
+    const removedPen = Array.isArray(inv) && !inv.includes('pen');
+    const addedItems = Array.isArray(inv) && inv.includes('marker') && inv.includes('ruler') && inv.includes('notebook');
+    checks.push({
+      name: 'Modifies, appends, inserts, and removes specified items',
+      passed: removedPen && addedItems,
+      message: removedPen && addedItems ? 'Passed' : 'Ensure pen is removed, eraser is changed to marker, ruler is appended, and notebook inserted'
+    });
+    if (removedPen && addedItems) marks += 1;
+
+    const lengthOk = Array.isArray(inv) && inv.length === 5;
+    checks.push({
+      name: 'Maintains correct final list length (5)',
+      passed: lengthOk,
+      message: lengthOk ? 'Passed' : `Expected length 5, got ${inv.length}`
+    });
+    if (lengthOk) marks += 1;
+
+    const exactMatch = JSON.stringify(inv) === JSON.stringify(expected);
+    checks.push({
+      name: 'Correct sequence: ["notebook", "book", "marker", "pencil", "ruler"]',
+      passed: exactMatch,
+      message: exactMatch ? 'Passed' : `Got [${(inv || []).join(', ')}]`
+    });
+    if (exactMatch) marks += 1;
+
+    results.push({
+      questionId: 'quiz-q1',
+      title: 'Question 1: List Operations',
+      earnedPoints: marks,
+      maxPoints: 3,
+      passed: marks === 3,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'quiz-q1',
+      title: 'Question 1: List Operations',
+      earnedPoints: 0,
+      maxPoints: 3,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Question 2: List Comprehension (3 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['quiz-q2'] || '';
+    const checks = [];
+    let marks = 0;
+
+    const usesListComp = /\[.*for\s+\w+\s+in\s+range.*\]/s.test(code) || /\[.*for\s+.*\]/s.test(code);
+    checks.push({
+      name: 'Uses list comprehension syntax',
+      passed: usesListComp,
+      message: usesListComp ? 'Passed' : 'Must use list comprehension syntax [x**2 for x in ... if ...]'
+    });
+    if (usesListComp) marks += 1;
+
+    await py.runPythonAsync(`
+odd_squares = []
+${code}
+`);
+    const r = getVar('odd_squares') || [];
+    const expected = [1, 9, 25, 49, 81, 121, 169, 225];
+    const pass = JSON.stringify(r) === JSON.stringify(expected);
+    checks.push({
+      name: 'Generates squares of odd numbers from 1 through 15',
+      passed: pass,
+      message: pass ? 'Passed' : `Expected [${expected.join(', ')}], got [${(r || []).join(', ')}]`
+    });
+    if (pass) marks += 2;
+
+    results.push({
+      questionId: 'quiz-q2',
+      title: 'Question 2: List Comprehension',
+      earnedPoints: marks,
+      maxPoints: 3,
+      passed: marks === 3,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'quiz-q2',
+      title: 'Question 2: List Comprehension',
+      earnedPoints: 0,
+      maxPoints: 3,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Question 3: Nested Lists (4 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['quiz-q3'] || '';
+    const checks = [];
+    let marks = 0;
+
+    const usesNestedOrComp = (/for\s+.*for\s+/s.test(code) || /\[.*for\s+.*for\s+.*\]/s.test(code));
+    checks.push({
+      name: 'Uses nested loops or list comprehension',
+      passed: usesNestedOrComp,
+      message: usesNestedOrComp ? 'Passed' : 'Use nested loops or list comprehension to flatten the matrix'
+    });
+    if (usesNestedOrComp) marks += 2;
+
+    await py.runPythonAsync(`
+matrix = [
+  [2, 4, 6],
+  [1, 3, 5],
+  [8, 10]
+]
+flat_values = []
+${code}
+`);
+    const r = getVar('flat_values') || [];
+    const expected = [2, 4, 6, 1, 3, 5, 8, 10];
+    const pass = JSON.stringify(r) === JSON.stringify(expected);
+    checks.push({
+      name: 'Correctly flattens matrix into [2, 4, 6, 1, 3, 5, 8, 10]',
+      passed: pass,
+      message: pass ? 'Passed' : `Expected [${expected.join(', ')}], got [${(r || []).join(', ')}]`
+    });
+    if (pass) marks += 2;
+
+    results.push({
+      questionId: 'quiz-q3',
+      title: 'Question 3: Nested Lists',
+      earnedPoints: marks,
+      maxPoints: 4,
+      passed: marks === 4,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'quiz-q3',
+      title: 'Question 3: Nested Lists',
+      earnedPoints: 0,
+      maxPoints: 4,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Question 4: Tuples (3 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['quiz-q4'] || '';
+    const checks = [];
+    let marks = 0;
+
+    await py.runPythonAsync(`
+t1 = ("Python", "Java")
+t2 = ("C++", "JavaScript")
+languages = None
+middle_languages = None
+${code}
+`);
+    const lang = getVar('languages') || [];
+    const mid = getVar('middle_languages') || [];
+
+    const expectedLang = ["Python", "Java", "C++", "JavaScript"];
+    const expectedMid = ["Java", "C++"];
+
+    const passLang = JSON.stringify(Array.from(lang)) === JSON.stringify(expectedLang);
+    checks.push({
+      name: 'Concatenates tuples into languages ("Python", "Java", "C++", "JavaScript")',
+      passed: passLang,
+      message: passLang ? 'Passed' : `Expected ("Python", "Java", "C++", "JavaScript"), got ${JSON.stringify(lang)}`
+    });
+    if (passLang) marks += 1;
+
+    const passMid = JSON.stringify(Array.from(mid)) === JSON.stringify(expectedMid);
+    checks.push({
+      name: 'Extracts middle two elements into middle_languages ("Java", "C++")',
+      passed: passMid,
+      message: passMid ? 'Passed' : `Expected ("Java", "C++"), got ${JSON.stringify(mid)}`
+    });
+    if (passMid) marks += 2;
+
+    results.push({
+      questionId: 'quiz-q4',
+      title: 'Question 4: Tuples',
+      earnedPoints: marks,
+      maxPoints: 3,
+      passed: marks === 3,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'quiz-q4',
+      title: 'Question 4: Tuples',
+      earnedPoints: 0,
+      maxPoints: 3,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Question 5: Dictionary Access and Update (3 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['quiz-q5'] || '';
+    const checks = [];
+    let marks = 0;
+
+    await py.runPythonAsync(`
+stock = {
+  "pen": 10,
+  "book": 4,
+  "eraser": 7
+}
+eraser_stock = None
+${code}
+`);
+    const st = getVar('stock') || {};
+    const erStock = getVar('eraser_stock');
+
+    const passBook = st['book'] === 8;
+    checks.push({
+      name: 'Updates "book" quantity to 8',
+      passed: passBook,
+      message: passBook ? 'Passed' : `Expected stock["book"] == 8, got ${st['book']}`
+    });
+    if (passBook) marks += 1;
+
+    const passMarker = st['marker'] === 5;
+    checks.push({
+      name: 'Adds new entry "marker": 5',
+      passed: passMarker,
+      message: passMarker ? 'Passed' : `Expected stock["marker"] == 5, got ${st['marker']}`
+    });
+    if (passMarker) marks += 1;
+
+    const passEraser = Number(erStock) === 7;
+    checks.push({
+      name: 'Extracts value for "eraser" into eraser_stock (7)',
+      passed: passEraser,
+      message: passEraser ? 'Passed' : `Expected eraser_stock == 7, got ${erStock}`
+    });
+    if (passEraser) marks += 1;
+
+    results.push({
+      questionId: 'quiz-q5',
+      title: 'Question 5: Dictionary Access and Update',
+      earnedPoints: marks,
+      maxPoints: 3,
+      passed: marks === 3,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'quiz-q5',
+      title: 'Question 5: Dictionary Access and Update',
+      earnedPoints: 0,
+      maxPoints: 3,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Question 6: Dictionary Processing (4 Marks)
+  // ---------------------------------------------------------------------------
+  try {
+    const code = codeMap['quiz-q6'] || '';
+    const checks = [];
+    let marks = 0;
+
+    const hasLoop = /for\s+.*in\s+.*:/i.test(code);
+    checks.push({
+      name: 'Iterates through dictionary items',
+      passed: hasLoop,
+      message: hasLoop ? 'Passed' : 'Use a for loop to iterate over scores'
+    });
+    if (hasLoop) marks += 1;
+
+    const hasThreshold = />=\s*80|>=\s*80\.0|>\s*79/i.test(code);
+    checks.push({
+      name: 'Applies >= 80 threshold condition',
+      passed: hasThreshold,
+      message: hasThreshold ? 'Passed' : 'Condition must check if score is 80 or greater'
+    });
+    if (hasThreshold) marks += 1;
+
+    await py.runPythonAsync(`
+scores = {
+  "Ava": 72,
+  "Liam": 91,
+  "Noah": 67,
+  "Mia": 88,
+  "Zoe": 95
+}
+high_scores = {}
+${code}
+`);
+    const hs = getVar('high_scores') || {};
+
+    const hasCorrectKeys = hs['Liam'] === 91 && hs['Mia'] === 88 && hs['Zoe'] === 95;
+    checks.push({
+      name: 'Includes only Liam (91), Mia (88), and Zoe (95)',
+      passed: hasCorrectKeys,
+      message: hasCorrectKeys ? 'Passed' : `Missing or incorrect qualifying entries: ${JSON.stringify(hs)}`
+    });
+    if (hasCorrectKeys) marks += 1;
+
+    const noExtras = !hs['Ava'] && !hs['Noah'] && Object.keys(hs).length === 3;
+    checks.push({
+      name: 'Excludes scores under 80 (Ava, Noah)',
+      passed: noExtras,
+      message: noExtras ? 'Passed' : `Non-qualifying entries were not filtered out: ${JSON.stringify(hs)}`
+    });
+    if (noExtras) marks += 1;
+
+    results.push({
+      questionId: 'quiz-q6',
+      title: 'Question 6: Dictionary Processing',
+      earnedPoints: marks,
+      maxPoints: 4,
+      passed: marks === 4,
+      checks
+    });
+  } catch (err) {
+    results.push({
+      questionId: 'quiz-q6',
+      title: 'Question 6: Dictionary Processing',
+      earnedPoints: 0,
+      maxPoints: 4,
+      passed: false,
+      checks: [{ name: 'Execution check', passed: false, message: `Python error: ${err.message}` }]
+    });
+  }
+
+  return results;
+}

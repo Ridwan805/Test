@@ -5,8 +5,12 @@ import {
   gradeHomework,
   gradeCodingQuiz,
   gradeModule3Homework,
-  gradeModule3Quiz
+  gradeModule3Quiz,
+  gradeModule4Homework,
+  gradeModule4Quiz
 } from '../../utils/pyodideRunner';
+import { apiFetch } from '../../utils/apiFetch';
+import { getJupyterNotebookContent, extractCodeFromNotebook } from '../../utils/jupyterStorage';
 
 export default function AssessmentWorksheet({
   courseSlug = 'intro-to-python',
@@ -18,9 +22,12 @@ export default function AssessmentWorksheet({
   const isAdmin = Boolean(user?.is_staff);
 
   const targetMod = parseInt(moduleNumber, 10) || 2;
+  const isMod4 = targetMod === 4;
   const isMod3 = targetMod === 3;
   const isHomework = assessmentType === 'homework';
-  const notebookPath = isMod3
+  const notebookPath = isMod4
+    ? (isHomework ? 'module-4-homework.ipynb' : 'module-4-coding-quiz.ipynb')
+    : isMod3
     ? (isHomework ? 'module-3-homework.ipynb' : 'module-3-coding-quiz.ipynb')
     : (isHomework ? 'module-2-homework.ipynb' : 'module-2-coding-quiz.ipynb');
 
@@ -37,9 +44,17 @@ export default function AssessmentWorksheet({
   // Running state per question
   const [runningQuestions, setRunningQuestions] = useState({});
 
-  // Submission state
+  // Submission & Notebook state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [viewMode, setViewMode] = useState(isHomework ? 'notebook' : 'cards');
+  const [gradingStep, setGradingStep] = useState('');
+  const [notebookKey, setNotebookKey] = useState(0);
+
+  useEffect(() => {
+    setViewMode(isHomework ? 'notebook' : 'cards');
+    setSubmissionResult(null);
+  }, [assessmentType, moduleNumber]);
 
   // Fetch assessment metadata and previous attempts
   useEffect(() => {
@@ -49,12 +64,8 @@ export default function AssessmentWorksheet({
       setError(null);
       setIsLocked(false);
       setLockDetails(null);
-      const token = localStorage.getItem('access_token');
-
       try {
-        const res = await fetch(`/api/courses/${courseSlug}/assessments/${assessmentType}?module=${targetMod}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
+        const res = await apiFetch(`/api/courses/${courseSlug}/assessments/${assessmentType}?module=${targetMod}`);
 
         if (res.status === 403) {
           const lockData = await res.json();
@@ -86,7 +97,43 @@ export default function AssessmentWorksheet({
                 return;
               }
 
-              if (isMod3) {
+              if (isMod4) {
+                // Module 4 Homework starters (unsolved templates)
+                if (isHomework) {
+                  if (q.id === 'hw-h1') {
+                    initialCode[q.id] = 'numbers = [10, 56, 36, 87, 66, 99, 21, 96, 56, 67, 98, 66, 21, 87, 10, 98]\nresult_list = []\n\n# Deduplicate numbers without using set() or direct helper functions:\n# Preserve the order of first appearance and store in: result_list\n';
+                  } else if (q.id === 'hw-h2') {
+                    initialCode[q.id] = 'input_numbers = [4, 12, 7, 25, 9, 10, 31, 2]\ngreater_than_10 = []\n\n# Filter numbers strictly greater than 10 into: greater_than_10\n';
+                  } else if (q.id === 'hw-h3') {
+                    initialCode[q.id] = 'nested_list = [[1, 2, 3, 4], [5, 6, 7, 8]]\n\n# Flatten nested_list using list comprehension into: flat_list\nflat_list = []\n';
+                  } else if (q.id === 'hw-h4') {
+                    initialCode[q.id] = 'original_list = [1, 2, 3, 4]\nn = 2\nrotated_list = []\n\n# Shift elements of original_list right by n positions:\n# Store result in: rotated_list\n';
+                  } else if (q.id === 'hw-h5') {
+                    initialCode[q.id] = 'data_list = [1, 2, 2, 3, 3, 3]\nfrequency_counts = {}\n\n# Count frequency of each element in data_list:\n# Store counts in dictionary: frequency_counts\n';
+                  } else if (q.id === 'hw-h6') {
+                    initialCode[q.id] = 'num_list = [12, 35, 1, 10, 34, 1]\nsecond_largest = None\n\n# Find the second largest number in num_list:\n# Store result in: second_largest\n';
+                  } else if (q.id === 'hw-h7') {
+                    initialCode[q.id] = 'raw_string = "Hello World"\nchar_freq = {}\n\n# Convert to lowercase, exclude spaces, and count character frequencies:\n# Store resulting dictionary in: char_freq\n';
+                  } else if (q.id === 'hw-h8') {
+                    initialCode[q.id] = 'n = 3\nsquares_dict = {}\n\n# Create dictionary where keys are 1 through n and values are their squares:\n# Store in: squares_dict\n';
+                  }
+                } else {
+                  // Module 4 Quiz starters (unsolved templates)
+                  if (q.id === 'quiz-q1') {
+                    initialCode[q.id] = 'inventory = ["pen", "book", "eraser", "pencil"]\nupdated_inventory = []\n\n# 1. Change "eraser" to "marker"\n# 2. Append "ruler"\n# 3. Insert "notebook" at index 1\n# 4. Remove "pen"\n# Store final list in: updated_inventory\n';
+                  } else if (q.id === 'quiz-q2') {
+                    initialCode[q.id] = '# Using list comprehension, generate squares of odd numbers from 1 to 15:\n# Store in: odd_squares\nodd_squares = []\n';
+                  } else if (q.id === 'quiz-q3') {
+                    initialCode[q.id] = 'matrix = [\n  [2, 4, 6],\n  [1, 3, 5],\n  [8, 10]\n]\nflat_values = []\n\n# Flatten matrix into 1D list using nested loops or list comprehension:\n# Store in: flat_values\n';
+                  } else if (q.id === 'quiz-q4') {
+                    initialCode[q.id] = 't1 = ("Python", "Java")\nt2 = ("C++", "JavaScript")\n\n# Concatenate t1 and t2 into: languages\n# Extract the middle two elements using slicing into: middle_languages\nlanguages = None\nmiddle_languages = None\n';
+                  } else if (q.id === 'quiz-q5') {
+                    initialCode[q.id] = 'stock = {\n  "pen": 10,\n  "book": 4,\n  "eraser": 7\n}\n\n# 1. Update "book" quantity to 8\n# 2. Add "marker": 5\n# 3. Extract the value for "eraser" into: eraser_stock\neraser_stock = None\n';
+                  } else if (q.id === 'quiz-q6') {
+                    initialCode[q.id] = 'scores = {\n  "Ava": 72,\n  "Liam": 91,\n  "Noah": 67,\n  "Mia": 88,\n  "Zoe": 95\n}\nhigh_scores = {}\n\n# Filter scores to include only entries where score >= 80:\n# Store in: high_scores\n';
+                  }
+                }
+              } else if (isMod3) {
                 // Module 3 Homework starters (unsolved templates)
                 if (isHomework) {
                   if (q.id === 'hw-a1') {
@@ -174,7 +221,7 @@ export default function AssessmentWorksheet({
     return () => {
       isMounted = false;
     };
-  }, [courseSlug, assessmentType, isHomework, targetMod, isMod3]);
+  }, [courseSlug, assessmentType, isHomework, targetMod, isMod3, isMod4]);
 
   // Handle running a single question's code
   const handleRunQuestion = async (qId) => {
@@ -196,7 +243,11 @@ export default function AssessmentWorksheet({
     try {
       // 1. Run automated grading in Pyodide
       let questionResults;
-      if (isMod3) {
+      if (isMod4) {
+        questionResults = isHomework
+          ? await gradeModule4Homework(studentCode)
+          : await gradeModule4Quiz(studentCode);
+      } else if (isMod3) {
         questionResults = isHomework
           ? await gradeModule3Homework(studentCode)
           : await gradeModule3Quiz(studentCode);
@@ -207,11 +258,10 @@ export default function AssessmentWorksheet({
       }
 
       // 2. Submit to backend API
-      const res = await fetch(`/api/courses/${courseSlug}/assessments/${assessmentType}/submit`, {
+      const res = await apiFetch(`/api/courses/${courseSlug}/assessments/${assessmentType}/submit`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           questionResults,
@@ -247,12 +297,104 @@ export default function AssessmentWorksheet({
       alert(`Submission error: ${err.message}`);
     } finally {
       setIsSubmitting(false);
-      window.scrollTo({ top: 300, behavior: 'smooth' });
+      setTimeout(() => {
+        document.getElementById('assessment-results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   };
 
   const handleRetry = () => {
     setSubmissionResult(null);
+  };
+
+  const handleNotebookSubmit = async () => {
+    setIsSubmitting(true);
+    setGradingStep('Reading your notebook from workspace storage...');
+
+    try {
+      // 1. Attempt Ctrl+S on embedded iframe
+      try {
+        const frame = document.getElementById('integrated-homework-jupyter-frame');
+        if (frame && frame.contentWindow) {
+          frame.contentWindow.document?.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 's', ctrlKey: true, metaKey: true, bubbles: true })
+          );
+        }
+      } catch (e) {
+        // Ignore iframe cross-origin if any
+      }
+
+      await new Promise((r) => setTimeout(r, 450));
+
+      // 2. Fetch notebook from IndexedDB / local storage
+      const nb = await getJupyterNotebookContent(notebookPath);
+      if (!nb) {
+        throw new Error(
+          'Could not find your homework notebook in workspace storage. Please make sure the notebook is loaded and you have tested your cells.'
+        );
+      }
+
+      setGradingStep('Extracting code solutions from notebook cells...');
+      const questionsList = assessmentData?.assessment?.questions || [];
+      const extractedCode = extractCodeFromNotebook(nb, questionsList, targetMod);
+
+      // Keep studentCode in state synchronized
+      setStudentCode((prev) => ({ ...prev, ...extractedCode }));
+
+      setGradingStep('Running automated grading test suite in WebAssembly...');
+      let questionResults;
+      if (isMod4) {
+        questionResults = await gradeModule4Homework(extractedCode);
+      } else if (isMod3) {
+        questionResults = await gradeModule3Homework(extractedCode);
+      } else {
+        questionResults = await gradeHomework(extractedCode);
+      }
+
+      setGradingStep('Recording official score and course progression...');
+      const res = await apiFetch(`/api/courses/${courseSlug}/assessments/${assessmentType}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          questionResults,
+          submittedCode: extractedCode,
+          moduleNumber: targetMod
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to record assessment score on server.');
+      }
+
+      const data = await res.json();
+      setSubmissionResult(data);
+
+      if (data.attempt) {
+        setAssessmentData((prev) => {
+          if (!prev) return prev;
+          const updatedAttempts = [data.attempt, ...(prev.attempts || [])];
+          return {
+            ...prev,
+            attempts: updatedAttempts,
+            bestScore: Math.max(prev.bestScore || 0, data.attempt.earnedPoints),
+            bestPercentage: Math.max(prev.bestPercentage || 0, data.attempt.percentage),
+            totalAttempts: updatedAttempts.length
+          };
+        });
+      }
+
+      onSubmitted(data);
+    } catch (err) {
+      alert(`Grading error: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+      setGradingStep('');
+      setTimeout(() => {
+        document.getElementById('assessment-results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   };
 
   if (loading) {
@@ -326,51 +468,264 @@ export default function AssessmentWorksheet({
 
   return (
     <div className="assessment-worksheet">
-      {/* Assessment Header Card */}
-      <div className="worksheet-header-card">
-        <div className="worksheet-header-top">
-          <div className="worksheet-badges">
-            <span className="pill-badge pill-type">GRADED ASSESSMENT</span>
-            <span className="pill-badge pill-level">
-              {isHomework ? 'WEIGHT: 40%' : 'WEIGHT: 60%'}
-            </span>
-            <span className="pill-badge pill-points">
-              MAX: {assessment.maxPoints} MARKS
-            </span>
-            {bestScore > 0 && (
-              <span className="pill-badge pill-best">
-                BEST: {bestScore} / {assessment.maxPoints} ({bestPercentage}%)
-              </span>
-            )}
+      {/* Assessment Header Card / Top Control Bar */}
+      {isHomework && viewMode === 'notebook' ? (
+        <div className="worksheet-header-card homework-integrated-header">
+          <div className="worksheet-header-top">
+            <div className="worksheet-badges">
+              <span className="pill-badge pill-type">INTEGRATED JUPYTER NOTEBOOK</span>
+              <span className="pill-badge pill-level">WEIGHT: 40%</span>
+              <span className="pill-badge pill-points">MAX: {assessment.maxPoints} MARKS</span>
+              {bestScore > 0 && (
+                <span className="pill-badge pill-best">
+                  BEST: {bestScore} / {assessment.maxPoints} ({bestPercentage}%)
+                </span>
+              )}
+            </div>
+
+            <div className="header-action-links">
+              <a
+                href={fullNotebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-open-notebook-tab"
+                title="Open standalone notebook in separate browser window"
+              >
+                ↗ Full Tab
+              </a>
+              <button
+                type="button"
+                className="btn-open-notebook-tab"
+                onClick={() => setNotebookKey((k) => k + 1)}
+                title="Reload the integrated notebook"
+              >
+                ↺ Reload
+              </button>
+              <button
+                type="button"
+                className="btn-open-notebook-tab"
+                onClick={() => setViewMode('cards')}
+                title="Switch to standalone question cards"
+              >
+                📋 Card View
+              </button>
+            </div>
           </div>
-          <a
-            href={fullNotebookUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-open-notebook-tab"
-            title="Open standalone notebook in separate tab"
-          >
-            ↗ Open in JupyterLite Notebook
-          </a>
+
+          <div className="homework-eval-main-row">
+            <div className="eval-main-text">
+              <h1 className="worksheet-title">{assessment.title}</h1>
+              <p className="worksheet-description">
+                Solve your homework problems directly inside the integrated Jupyter Notebook below. Use <strong>Shift + Enter</strong> to run cells. When finished, scroll down and click <strong>Submit & Grade Notebook</strong> to calculate and save your official score.
+              </p>
+            </div>
+          </div>
         </div>
+      ) : (
+        <div className="worksheet-header-card">
+          <div className="worksheet-header-top">
+            <div className="worksheet-badges">
+              <span className="pill-badge pill-type">GRADED ASSESSMENT</span>
+              <span className="pill-badge pill-level">
+                {isHomework ? 'WEIGHT: 40%' : 'WEIGHT: 60%'}
+              </span>
+              <span className="pill-badge pill-points">
+                MAX: {assessment.maxPoints} MARKS
+              </span>
+              {bestScore > 0 && (
+                <span className="pill-badge pill-best">
+                  BEST: {bestScore} / {assessment.maxPoints} ({bestPercentage}%)
+                </span>
+              )}
+            </div>
+            <div className="header-action-links">
+              {isHomework && (
+                <button
+                  type="button"
+                  className="btn-open-notebook-tab"
+                  onClick={() => setViewMode('notebook')}
+                  title="Switch to integrated Jupyter Notebook"
+                >
+                  📓 Notebook View
+                </button>
+              )}
+              <a
+                href={fullNotebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-open-notebook-tab"
+                title="Open standalone notebook in separate tab"
+              >
+                ↗ Open in JupyterLite Notebook
+              </a>
+            </div>
+          </div>
 
-        <h1 className="worksheet-title">{assessment.title}</h1>
-        <p className="worksheet-description">{assessment.description}</p>
+          <h1 className="worksheet-title">{assessment.title}</h1>
+          <p className="worksheet-description">{assessment.description}</p>
 
-        <div className="worksheet-notice">
-          <span className="notice-icon">ℹ️</span>
-          <span>
-            <strong>Distraction-Free Coding Worksheet:</strong> Enter your solution in each designated answer cell below, click <strong>Run Code</strong> to test, and click <strong>Submit {isHomework ? 'Homework' : 'Coding Quiz'}</strong> when complete. You may retry to improve your score.
-          </span>
+          <div className="worksheet-notice">
+            <span className="notice-icon">ℹ️</span>
+            <span>
+              <strong>Distraction-Free Coding Worksheet:</strong> Enter your solution in each designated answer cell below, click <strong>Run Code</strong> to test, and click <strong>Submit {isHomework ? 'Homework' : 'Coding Quiz'}</strong> when complete. You may retry to improve your score.
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Submission Results Panel */}
+      {/* Integrated Jupyter Notebook Mode vs Classic Questions Form */}
+      {isHomework && viewMode === 'notebook' ? (
+        <div className="integrated-jupyter-workspace-wrapper">
+          <div className="jupyter-workspace-meta-banner">
+            <div className="meta-banner-left">
+              <span className="meta-banner-dot" />
+              <span className="meta-banner-text">
+                EcoIntuition Academy Integrated Notebook &bull; <strong>{notebookPath}</strong>
+              </span>
+            </div>
+            <div className="meta-banner-right">
+              <span className="meta-tip">
+                💡 Tip: Solve problems inside the notebook. Run with <strong>Shift + Enter</strong>.
+              </span>
+            </div>
+          </div>
+
+          <div className="integrated-jupyter-frame-container">
+            <iframe
+              key={notebookKey}
+              id="integrated-homework-jupyter-frame"
+              src={fullNotebookUrl}
+              title={assessment.title}
+              className="integrated-homework-iframe"
+              allow="clipboard-read; clipboard-write"
+            />
+          </div>
+
+          <div className="notebook-bottom-submit-banner">
+            <div className="bottom-submit-info">
+              <h4>Ready to evaluate your homework?</h4>
+              <p>
+                Clicking Submit extracts all student code cells from the notebook, runs the official automated grading suite, and updates your marks and course progression.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-submit-notebook-bottom"
+              onClick={handleNotebookSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="live-spinner-icon" />
+                  <span>{gradingStep || 'Grading Notebook...'}</span>
+                </>
+              ) : (
+                `🚀 Submit & Grade Notebook (${assessment.maxPoints} Marks) →`
+              )}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Questions Form Area */}
+          <div className="worksheet-questions-list">
+            {assessment.questions?.map((q, idx) => {
+              const qOutput = outputs[q.id];
+              const isRunning = runningQuestions[q.id];
+
+              return (
+                <div key={q.id} className="worksheet-question-card">
+                  <div className="question-header">
+                    <div className="q-title-group">
+                      <span className="q-badge">QUESTION {idx + 1}</span>
+                      <h3 className="q-title">{q.title}</h3>
+                    </div>
+                    <span className="q-marks-pill">{q.maxPoints} MARKS</span>
+                  </div>
+
+                  {q.instructions && (
+                    <div className="q-instructions">
+                      <p>{q.instructions}</p>
+                    </div>
+                  )}
+
+                  {/* Code Editor */}
+                  <div className="q-code-area">
+                    <div className="code-area-header">
+                      <span className="editor-label">YOUR CODE</span>
+                      <span className="editor-lang">PYTHON 3 · PYODIDE</span>
+                    </div>
+                    <textarea
+                      className="code-textarea"
+                      value={studentCode[q.id] || ''}
+                      onChange={(e) =>
+                        setStudentCode({ ...studentCode, [q.id]: e.target.value })
+                      }
+                      rows={8}
+                      spellCheck="false"
+                      placeholder="# Write your Python solution here..."
+                    />
+                    <div className="code-area-actions">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-run"
+                        onClick={() => handleRunQuestion(q.id)}
+                        disabled={isRunning}
+                      >
+                        {isRunning ? 'Running...' : '▶ Run Code'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Console Output */}
+                  {qOutput && (
+                    <div className={`q-console-output ${qOutput.error ? 'has-error' : ''}`}>
+                      <div className="console-header">
+                        <span className="console-dot red" />
+                        <span className="console-dot yellow" />
+                        <span className="console-dot green" />
+                        <span className="console-label">
+                          {qOutput.error ? 'ERROR CONSOLE' : 'OUTPUT CONSOLE'}
+                        </span>
+                      </div>
+                      <pre className="console-pre">
+                        <code>{qOutput.error || qOutput.output || '(No printed output)'}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Final Submit Section */}
+          <div className="worksheet-submit-card">
+            <div>
+              <h3>Ready to Submit?</h3>
+              <p>
+                Submitting will evaluate all {assessment.questions?.length} problems with automated checks and record your marks in your scholar profile.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-submit-assessment"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? 'Grading Assessment...'
+                : `Submit ${isHomework ? 'Homework (40 Marks)' : 'Coding Quiz (20 Marks)'} →`}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Submission Results Panel & Marks Breakdown (at the bottom after submission) */}
       {submissionResult && (
-        <div className="submission-result-modal">
+        <div className="submission-result-modal" id="assessment-results-section" style={{ marginTop: '2.5rem' }}>
           <div className="result-card-header">
             <div>
-              <span className="result-pill">ASSESSMENT RESULTS</span>
+              <span className="result-pill">OFFICIAL ASSESSMENT EVALUATION</span>
               <h2 className="result-title">
                 {isHomework ? `Module ${targetMod} Homework Result` : `Module ${targetMod} Coding Quiz Result`}
               </h2>
@@ -449,105 +804,14 @@ export default function AssessmentWorksheet({
           <div className="result-actions">
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-secondary"
               onClick={handleRetry}
             >
-              ↺ Retry Assessment
+              ↺ Clear Results / Re-attempt
             </button>
           </div>
         </div>
       )}
-
-      {/* Questions Form Area */}
-      <div className="worksheet-questions-list">
-        {assessment.questions?.map((q, idx) => {
-          const qOutput = outputs[q.id];
-          const isRunning = runningQuestions[q.id];
-
-          return (
-            <div key={q.id} className="worksheet-question-card">
-              <div className="question-header">
-                <div className="q-title-group">
-                  <span className="q-badge">QUESTION {idx + 1}</span>
-                  <h3 className="q-title">{q.title}</h3>
-                </div>
-                <span className="q-marks-pill">{q.maxPoints} MARKS</span>
-              </div>
-
-              {q.instructions && (
-                <div className="q-instructions">
-                  <p>{q.instructions}</p>
-                </div>
-              )}
-
-              {/* Code Editor */}
-              <div className="q-code-area">
-                <div className="code-area-header">
-                  <span className="editor-label">YOUR CODE</span>
-                  <span className="editor-lang">PYTHON 3 · PYODIDE</span>
-                </div>
-                <textarea
-                  className="code-textarea"
-                  value={studentCode[q.id] || ''}
-                  onChange={(e) =>
-                    setStudentCode({ ...studentCode, [q.id]: e.target.value })
-                  }
-                  rows={8}
-                  spellCheck="false"
-                  placeholder="# Write your Python solution here..."
-                />
-                <div className="code-area-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-run"
-                    onClick={() => handleRunQuestion(q.id)}
-                    disabled={isRunning}
-                  >
-                    {isRunning ? 'Running...' : '▶ Run Code'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Console Output */}
-              {qOutput && (
-                <div className={`q-console-output ${qOutput.error ? 'has-error' : ''}`}>
-                  <div className="console-header">
-                    <span className="console-dot red" />
-                    <span className="console-dot yellow" />
-                    <span className="console-dot green" />
-                    <span className="console-label">
-                      {qOutput.error ? 'ERROR CONSOLE' : 'OUTPUT CONSOLE'}
-                    </span>
-                  </div>
-                  <pre className="console-pre">
-                    <code>{qOutput.error || qOutput.output || '(No printed output)'}</code>
-                  </pre>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Final Submit Section */}
-      <div className="worksheet-submit-card">
-        <div>
-          <h3>Ready to Submit?</h3>
-          <p>
-            Submitting will evaluate all {assessment.questions?.length} problems with automated checks and record your marks in your scholar profile.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn btn-primary btn-submit-assessment"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting
-            ? 'Grading Assessment...'
-            : `Submit ${isHomework ? 'Homework (40 Marks)' : 'Coding Quiz (20 Marks)'} →`}
-        </button>
-      </div>
 
       {/* Previous Attempts History */}
       {attempts.length > 0 && (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function CourseDashboard() {
   const { courseSlug: rawCourseSlug = 'intro-to-python' } = useParams();
@@ -31,14 +32,13 @@ export default function CourseDashboard() {
     async function fetchDashboard() {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('access_token');
       try {
-        const res = await fetch(`/api/courses/${courseSlug}/modules`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
+        const res = await apiFetch(`/api/courses/${courseSlug}/modules`);
 
         if (res.status === 401) {
-          navigate('/login', { state: { from: `/learn/${courseSlug}` } });
+          if (!localStorage.getItem('cached_user')) {
+            navigate('/login', { state: { from: `/learn/${courseSlug}` } });
+          }
           return;
         }
 
@@ -92,7 +92,8 @@ export default function CourseDashboard() {
     curriculum = [],
     module2GradeSummary,
     module3GradeSummary,
-    totalLessons = 15,
+    module4GradeSummary,
+    totalLessons = 24,
     completedLessons = 0,
     progressPercentage = 0
   } = curriculumData;
@@ -180,6 +181,7 @@ export default function CourseDashboard() {
             const isMod2 = mod.moduleNumber === 2;
             const isMod3 = mod.moduleNumber === 3;
             const isMod4 = mod.moduleNumber === 4;
+            const isMod5 = mod.moduleNumber === 5;
             const targetUrl = `/learn/${course.slug}/module/${mod.moduleNumber}`;
 
             return (
@@ -203,19 +205,13 @@ export default function CourseDashboard() {
                     {isMod1 && (
                       <span className="pill-badge pill-intro">INTRODUCTORY</span>
                     )}
-                    {(isMod2 || isMod3) && (
+                    {(isMod2 || isMod3 || isMod4) && (
                       <span className="pill-badge pill-graded">GRADED (80% REQ)</span>
                     )}
-                    {isMod3 && isLocked && (
+                    {(isMod3 || isMod4 || isMod5) && isLocked && (
                       <span className="pill-badge pill-lock-badge">🔒 LOCKED</span>
                     )}
-                    {isMod3 && !isLocked && (
-                      <span className="pill-badge pill-unlocked">✓ UNLOCKED</span>
-                    )}
-                    {isMod4 && isLocked && (
-                      <span className="pill-badge pill-lock-badge">🔒 LOCKED</span>
-                    )}
-                    {isMod4 && !isLocked && (
+                    {(isMod3 || isMod4 || isMod5) && !isLocked && (
                       <span className="pill-badge pill-unlocked">✓ UNLOCKED</span>
                     )}
                   </div>
@@ -231,17 +227,28 @@ export default function CourseDashboard() {
                   <div className="card-mod-meta-row">
                     <span>
                       {isLocked
-                        ? (isMod4 ? 'Prerequisite Locked (80% in Mod 3)' : 'Prerequisite Locked (80% in Mod 2)')
+                        ? (isMod5 ? 'Prerequisite Locked (80% in Mod 4)' : isMod4 ? 'Prerequisite Locked (80% in Mod 3)' : 'Prerequisite Locked (80% in Mod 2)')
                         : `${modCompleted} of ${modTotal} Lessons (${pct}%)`}
                     </span>
                     {isMod2 && module2GradeSummary && (
                       <span style={{ fontWeight: 700, color: module2GradeSummary.passed ? '#16A34A' : '#B45309' }}>
-                        Grade: {module2GradeSummary.moduleGrade}%
+                        {module2GradeSummary.homework?.attemptsCount > 0 || module2GradeSummary.quiz?.attemptsCount > 0
+                          ? `Grade: ${module2GradeSummary.moduleGrade}%`
+                          : 'Grade: Not submitted'}
                       </span>
                     )}
                     {isMod3 && module3GradeSummary && (
                       <span style={{ fontWeight: 700, color: module3GradeSummary.passed ? '#16A34A' : '#B45309' }}>
-                        Grade: {module3GradeSummary.moduleGrade}%
+                        {module3GradeSummary.homework?.attemptsCount > 0 || module3GradeSummary.quiz?.attemptsCount > 0
+                          ? `Grade: ${module3GradeSummary.moduleGrade}%`
+                          : 'Grade: Not submitted'}
+                      </span>
+                    )}
+                    {isMod4 && module4GradeSummary && (
+                      <span style={{ fontWeight: 700, color: module4GradeSummary.passed ? '#16A34A' : '#B45309' }}>
+                        {module4GradeSummary.homework?.attemptsCount > 0 || module4GradeSummary.quiz?.attemptsCount > 0
+                          ? `Grade: ${module4GradeSummary.moduleGrade}%`
+                          : 'Grade: Not submitted'}
                       </span>
                     )}
                   </div>

@@ -1,8 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import JupyterLiteExercise from '../course/JupyterLiteExercise';
+import { runPythonCode } from '../../utils/pyodideRunner';
 
-function CodeBlock({ code, language = 'python' }) {
+function CodeBlock({ code: initialCode = '', language = 'python' }) {
+  const [code, setCode] = useState(initialCode);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [output, setOutput] = useState(null);
+  const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setCode(initialCode || '');
+    setOutput(null);
+    setError(null);
+    setIsEditing(false);
+  }, [initialCode]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -10,22 +23,159 @@ function CodeBlock({ code, language = 'python' }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const isPython = !language || language.toLowerCase() === 'python' || language.toLowerCase() === 'py';
+
+  const handleRun = async () => {
+    if (!isPython || isRunning) return;
+    setIsRunning(true);
+    setError(null);
+    setOutput(null);
+
+    try {
+      const res = await runPythonCode(code);
+      if (res.success) {
+        setOutput(res.output || '(Code executed successfully with no printed output)');
+        setError(null);
+      } else {
+        setOutput(null);
+        setError(res.error || 'Execution failed');
+      }
+    } catch (err) {
+      setOutput(null);
+      setError(err.message || 'Execution error');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const handleReset = () => {
+    setCode(initialCode || '');
+    setOutput(null);
+    setError(null);
+    setIsEditing(false);
+  };
+
+  const isModified = code !== initialCode;
+
   return (
     <div className="content-code-block">
       <div className="code-header">
-        <span className="code-lang">{language.toUpperCase()}</span>
-        <button
-          type="button"
-          className="code-copy-btn"
-          onClick={handleCopy}
-          aria-label="Copy code to clipboard"
-        >
-          {copied ? '✓ Copied!' : 'Copy Code'}
-        </button>
+        <div className="code-header-left">
+          <span className="code-lang">{(language || 'PYTHON').toUpperCase()}</span>
+          {isPython && (
+            <span className="code-interactive-tag" title="Can be executed directly in your browser">
+              ⚡ LIVE DEMO
+            </span>
+          )}
+        </div>
+        <div className="code-header-actions">
+          {isPython && (
+            <button
+              type="button"
+              className={`code-run-btn ${isRunning ? 'running' : ''}`}
+              onClick={handleRun}
+              disabled={isRunning}
+              title="Execute this example live in your browser"
+            >
+              {isRunning ? (
+                <>
+                  <span className="live-spinner-icon" />
+                  <span>Running...</span>
+                </>
+              ) : (
+                <>
+                  <span className="play-triangle">▶</span>
+                  <span>Run Live</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {isPython && (
+            <button
+              type="button"
+              className={`code-action-btn ${isEditing ? 'active' : ''}`}
+              onClick={() => setIsEditing(!isEditing)}
+              title={isEditing ? 'Switch to code view' : 'Tweak and test this code live'}
+            >
+              {isEditing ? '👁 View Code' : '✏ Edit'}
+            </button>
+          )}
+
+          {isModified && (
+            <button
+              type="button"
+              className="code-action-btn code-reset-btn"
+              onClick={handleReset}
+              title="Reset code back to original example"
+            >
+              ↺ Reset
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="code-copy-btn"
+            onClick={handleCopy}
+            aria-label="Copy code to clipboard"
+          >
+            {copied ? '✓ Copied!' : 'Copy'}
+          </button>
+        </div>
       </div>
-      <pre className="code-pre">
-        <code>{code}</code>
-      </pre>
+
+      {isEditing ? (
+        <div className="code-editor-container">
+          <textarea
+            className="code-editor-textarea"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            spellCheck="false"
+            rows={Math.max(4, code.split('\n').length + 1)}
+            aria-label="Interactive Python code editor"
+          />
+        </div>
+      ) : (
+        <pre className="code-pre">
+          <code>{code}</code>
+        </pre>
+      )}
+
+      {/* Live Output Console directly below code */}
+      {(output !== null || error !== null || isRunning) && (
+        <div className="code-live-terminal">
+          <div className="live-terminal-bar">
+            <div className="live-terminal-dots">
+              <span className="terminal-dot dot-red" />
+              <span className="terminal-dot dot-yellow" />
+              <span className="terminal-dot dot-green" />
+            </div>
+            <span className="live-terminal-label">
+              {isRunning ? 'EXECUTING IN PYODIDE RUNTIME...' : 'LIVE EXECUTION OUTPUT'}
+            </span>
+            <button
+              type="button"
+              className="live-terminal-dismiss"
+              onClick={() => { setOutput(null); setError(null); }}
+              title="Close output"
+            >
+              ✕ Clear
+            </button>
+          </div>
+          <div className="live-terminal-viewport">
+            {isRunning ? (
+              <div className="live-terminal-loading">
+                <span className="live-spinner-icon big" />
+                <span>Running Python code live in browser WebAssembly...</span>
+              </div>
+            ) : error ? (
+              <pre className="live-terminal-err-content">{error}</pre>
+            ) : (
+              <pre className="live-terminal-out-content">{output}</pre>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

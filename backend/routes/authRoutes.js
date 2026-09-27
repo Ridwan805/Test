@@ -12,11 +12,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'aintuition_super_secret_jwt_access
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'aintuition_super_secret_jwt_refresh_key_2026';
 
 const generateAccessToken = (id) => {
-  return jwt.sign({ id }, JWT_SECRET, { expiresIn: '1h' });
+  return jwt.sign({ id }, JWT_SECRET, { expiresIn: '365d' });
 };
 
 const generateRefreshToken = (id) => {
-  return jwt.sign({ id }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ id }, JWT_REFRESH_SECRET, { expiresIn: '365d' });
 };
 
 // Helper: Real-time Email & Mailbox Verification via ZeroBounce & DNS
@@ -171,7 +171,7 @@ router.post('/login/', async (req, res) => {
 
 // @route   POST /api/auth/token/refresh/
 // @desc    Refresh access token using refresh token
-router.post('/token/refresh/', async (req, res) => {
+router.post(['/token/refresh', '/token/refresh/'], async (req, res) => {
   const { refresh } = req.body;
 
   if (!refresh) {
@@ -181,14 +181,15 @@ router.post('/token/refresh/', async (req, res) => {
   try {
     const decoded = jwt.verify(refresh, JWT_REFRESH_SECRET);
     const access = generateAccessToken(decoded.id);
-    res.json({ access });
+    const newRefresh = generateRefreshToken(decoded.id);
+    res.json({ access, refresh: newRefresh });
   } catch (error) {
     res.status(401).json({ detail: 'Invalid or expired refresh token' });
   }
 });
 
 // @route   GET /api/auth/me/
-// @desc    Get current user profile
+// @desc    Get current user profile & refresh active tokens
 router.get('/me/', protect, async (req, res) => {
   res.json({
     id: req.user._id,
@@ -197,7 +198,9 @@ router.get('/me/', protect, async (req, res) => {
     last_name: req.user.last_name,
     is_staff: req.user.is_staff,
     is_active: req.user.is_active,
-    date_joined: req.user.date_joined
+    date_joined: req.user.date_joined,
+    access: generateAccessToken(req.user._id),
+    refresh: generateRefreshToken(req.user._id)
   });
 });
 

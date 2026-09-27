@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function ModulePage() {
   const { courseSlug: rawCourseSlug = 'intro-to-python', moduleNumber = '1' } = useParams();
@@ -36,15 +37,14 @@ export default function ModulePage() {
       setLoading(true);
       setError(null);
       setIsLocked(false);
-      const token = localStorage.getItem('access_token');
 
       try {
-        const res = await fetch(`/api/courses/${courseSlug}/modules/${moduleNumber}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
+        const res = await apiFetch(`/api/courses/${courseSlug}/modules/${moduleNumber}`);
 
         if (res.status === 401) {
-          navigate('/login', { state: { from: `/learn/${courseSlug}/module/${moduleNumber}` } });
+          if (!localStorage.getItem('cached_user')) {
+            navigate('/login', { state: { from: `/learn/${courseSlug}/module/${moduleNumber}` } });
+          }
           return;
         }
 
@@ -133,40 +133,43 @@ export default function ModulePage() {
       0;
 
     return (
-      <div className="container" style={{ padding: '4rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
+      <div className="container" style={{ padding: '3.5rem 1rem', maxWidth: '720px', margin: '0 auto' }}>
         <div className="dashboard-breadcrumb" style={{ marginBottom: '1.5rem' }}>
           <Link to={`/learn/${courseSlug}`} className="breadcrumb-back">
             ← Back to Course Dashboard
           </Link>
         </div>
 
-        <div className="module-locked-notice" style={{ padding: '3rem 2rem', textAlign: 'center' }}>
-          <div className="locked-icon-wrapper" style={{ margin: '0 auto 1.5rem auto' }}>
-            <span className="big-lock-icon" style={{ fontSize: '3rem' }}>🔒</span>
+        <div className="module-locked-card">
+          <div className="locked-badge-circle">
+            <span style={{ fontSize: '2.5rem', lineHeight: 1 }}>🔒</span>
           </div>
-          <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-brand)', marginBottom: '0.75rem' }}>
+
+          <h2 className="locked-card-title">
             Module {moduleNumber} is Locked
           </h2>
-          <p style={{ color: '#475569', fontSize: '1.05rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+
+          <p className="locked-card-desc">
             {lockDetails?.detail || `To unlock this module, you must achieve a combined score of at least 80% in Module ${requiredMod} (Homework + Coding Quiz).`}
           </p>
 
-          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '1rem', marginBottom: '2rem', display: 'inline-block' }}>
-            <span style={{ fontWeight: 700, color: '#92400E' }}>
-              Your Current Module {requiredMod} Grade: {prevGrade}% / Required: 80%
+          <div className="locked-grade-pill">
+            <span style={{ fontSize: '1.2rem' }}>📊</span>
+            <span>
+              Your Current Module {requiredMod} Grade: <strong>{prevGrade}%</strong> / Required: <strong>80%</strong>
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="locked-actions-group">
             <Link
               to={`/learn/${courseSlug}/module/${requiredMod}/lesson/module-${requiredMod}-homework`}
-              className="btn btn-primary"
+              className="btn btn-primary btn-large"
             >
               Improve Homework Score →
             </Link>
             <Link
               to={`/learn/${courseSlug}/module/${requiredMod}/lesson/module-${requiredMod}-coding-quiz`}
-              className="btn btn-secondary"
+              className="btn btn-secondary btn-large"
             >
               Improve Quiz Score →
             </Link>
@@ -196,7 +199,7 @@ export default function ModulePage() {
     );
   }
 
-  const { course, module: modDoc, lessons = [], module2GradeSummary, module3GradeSummary } = moduleData;
+  const { course, module: modDoc, lessons = [], module2GradeSummary, module3GradeSummary, module4GradeSummary } = moduleData;
 
   const completedCount = lessons.filter((l) => l.completed).length;
   const totalCount = lessons.length;
@@ -204,14 +207,19 @@ export default function ModulePage() {
   const isMod1 = modNum === 1;
   const isMod2 = modNum === 2;
   const isMod3 = modNum === 3;
-  const isGradedModule = isMod2 || isMod3;
-  const activeGradeSummary = isMod2 ? module2GradeSummary : isMod3 ? module3GradeSummary : null;
+  const isMod4 = modNum === 4;
+  const isGradedModule = isMod2 || isMod3 || isMod4;
+  const activeGradeSummary = isMod2 ? module2GradeSummary : isMod3 ? module3GradeSummary : isMod4 ? module4GradeSummary : null;
 
   const lesson8 = lessons.find((l) => l.lessonNumber === 8);
   const isHomeworkUnlocked = !isGradedModule || user?.is_staff || (lesson8 ? lesson8.completed : true);
+  const hasHomeworkAttempt = (activeGradeSummary?.homework?.attemptsCount || 0) > 0;
   const isHomeworkPassed = (activeGradeSummary?.homework?.bestPercentage || 0) >= 80;
   const allLessonsCompleted = lessons.length > 0 && lessons.every((l) => l.completed);
-  const isQuizUnlocked = !isGradedModule || user?.is_staff || (isHomeworkPassed && allLessonsCompleted);
+  const isQuizUnlocked =
+    !isGradedModule ||
+    user?.is_staff ||
+    (isMod4 ? hasHomeworkAttempt && allLessonsCompleted : isHomeworkPassed && allLessonsCompleted);
 
   // Determine first incomplete, unlocked lesson to start learning
   const nextIncompleteLesson = lessons.find((l) => !l.completed && !l.locked);
@@ -339,7 +347,9 @@ export default function ModulePage() {
                 </div>
                 <h4 className="stat-title">Module 0{modNum} Official Homework</h4>
                 <p className="stat-desc">
-                  {isMod3
+                  {isMod4
+                    ? '8 problems covering list deduplication, list comprehension filtering, nested list flattening, list rotation, frequency counting, second largest, and dictionary mapping.'
+                    : isMod3
                     ? '11 problems covering Conditionals (12m), Nested Conditions (4m), and Loops (24m).'
                     : '5 problems covering input, rectangle dimensions, temperature conversion, and digit extraction.'}
                 </p>
@@ -372,7 +382,9 @@ export default function ModulePage() {
                   <span className="stat-type">
                     {isQuizUnlocked
                       ? 'CODING QUIZ (60%)'
-                      : !isHomeworkPassed
+                      : isMod4 && !hasHomeworkAttempt
+                      ? '🔒 LOCKED (REQUIRES HW ATTEMPT)'
+                      : !isHomeworkPassed && !isMod4
                       ? '🔒 LOCKED (REQUIRES HW ≥80%)'
                       : '🔒 LOCKED (REQUIRES ALL LESSONS)'}
                   </span>
@@ -382,7 +394,9 @@ export default function ModulePage() {
                 </div>
                 <h4 className="stat-title">Module 0{modNum} Final Coding Quiz</h4>
                 <p className="stat-desc">
-                  {isMod3
+                  {isMod4
+                    ? '6 transfer problems testing list operations, list comprehension odd squares, 2D matrix flattening, tuple immutability, and dictionary threshold filtering.'
+                    : isMod3
                     ? '6 problems testing battery status, course access, countdown sum, multiples of 3, loop controls, and nested loops.'
                     : '6 integrated problems evaluating types, arithmetic, string operations, relational and logical logic.'}
                 </p>
@@ -413,7 +427,7 @@ export default function ModulePage() {
               <div className="assessment-stat-card practice-card">
                 <div className="stat-card-top">
                   <span className="stat-type green">UNGRADED PRACTICE LAB</span>
-                  <span className="stat-marks green">{isMod3 ? '12 Practice Sections' : '9 Practice Sections'}</span>
+                  <span className="stat-marks green">{isMod4 ? '9 Practice Sections' : isMod3 ? '12 Practice Sections' : '9 Practice Sections'}</span>
                 </div>
                 <h4 className="stat-title">Module 0{modNum} Practice Notebook</h4>
                 <p className="stat-desc">

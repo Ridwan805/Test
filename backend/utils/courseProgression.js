@@ -69,7 +69,8 @@ export async function getModuleGradeSummary(userId, courseId, moduleNumber = 2) 
     passed,
     requiredGrade: 80,
     module3Unlocked: modNum === 2 ? passed : true,
-    module4Unlocked: modNum === 3 ? passed : false,
+    module4Unlocked: modNum === 3 ? passed : (modNum > 3),
+    module5Unlocked: modNum === 4 ? passed : (modNum > 4),
     homework: {
       assessmentId: hwAssessment?._id,
       title: hwAssessment?.title || `Module ${modNum} Official Graded Homework`,
@@ -208,19 +209,38 @@ export async function checkLessonAccess(userId, courseId, moduleNumber, lessonSl
 
   // CASE B: User is attempting to access Coding Quiz
   if (isQuiz) {
-    // 1. Coding Quiz strictly requires Homework to be passed with >= 80%
-    if (!hwPassed) {
-      return {
-        accessible: false,
-        reason: 'homework_required',
-        detail: `To take the Coding Quiz, you must first complete the Module ${modNum} Homework with at least an 80% passing grade (Current: ${hwBestPercent}%).`,
-        requiredHomework: {
-          slug: hwAssessment?.slug || `module-${modNum}-homework`,
-          title: hwAssessment?.title || `Module ${modNum} Homework`,
-          bestPercentage: hwBestPercent,
-          requiredPercentage: 80
-        }
-      };
+    if (modNum >= 4) {
+      const hwAttempts = await AssessmentAttempt.find({
+        userId,
+        assessmentId: hwAssessment?._id
+      });
+      if (!hwAttempts || hwAttempts.length === 0) {
+        return {
+          accessible: false,
+          reason: 'homework_required',
+          detail: `To take the Coding Quiz, you must first submit at least one attempt on the Module ${modNum} Homework.`,
+          requiredHomework: {
+            slug: hwAssessment?.slug || `module-${modNum}-homework`,
+            title: hwAssessment?.title || `Module ${modNum} Homework`,
+            bestPercentage: hwBestPercent,
+            requiredPercentage: 0
+          }
+        };
+      }
+    } else {
+      if (!hwPassed) {
+        return {
+          accessible: false,
+          reason: 'homework_required',
+          detail: `To take the Coding Quiz, you must first complete the Module ${modNum} Homework with at least an 80% passing grade (Current: ${hwBestPercent}%).`,
+          requiredHomework: {
+            slug: hwAssessment?.slug || `module-${modNum}-homework`,
+            title: hwAssessment?.title || `Module ${modNum} Homework`,
+            bestPercentage: hwBestPercent,
+            requiredPercentage: 80
+          }
+        };
+      }
     }
 
     // 2. Coding Quiz requires all lessons in the module to be completed
@@ -268,8 +288,8 @@ export async function checkLessonAccess(userId, courseId, moduleNumber, lessonSl
     };
   }
 
-  // 2. If lesson comes AFTER Homework (Lesson 9+), Homework must be completed with >= 80%
-  if (currentLesson.lessonNumber >= 9) {
+  // 2. If lesson comes AFTER Homework (Lesson 9+ in Mod 2/3), Homework must be completed with >= 80%
+  if (currentLesson.lessonNumber >= 9 && modNum <= 3) {
     if (!hwPassed) {
       return {
         accessible: false,
@@ -345,7 +365,7 @@ export async function getLessonsWithLockStatus(userId, courseId, moduleNumber, i
         }
       }
 
-      if (l.lessonNumber >= 9 && !hwPassed) {
+      if (l.lessonNumber >= 9 && modNum <= 3 && !hwPassed) {
         isLocked = true;
         lockReason = `Requires Homework (≥80%)`;
         requiredItem = { type: 'homework', slug: hwAssessment?.slug || `module-${modNum}-homework`, title: hwAssessment?.title || `Module ${modNum} Homework`, bestPercentage: hwBestPercent };

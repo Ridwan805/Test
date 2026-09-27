@@ -12,6 +12,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import { seedPythonModule1 } from './seed/pythonModule1.js';
 import { seedPythonModule2 } from './seed/pythonModule2.js';
 import { seedPythonModule3 } from './seed/pythonModule3.js';
+import { seedPythonModule4 } from './seed/pythonModule4.js';
 import { seedRModule1 } from './seed/rModule1.js';
 import { seedBootcamps } from './seed/bootcamps.js';
 
@@ -115,6 +116,13 @@ try {
   console.error('[Server Startup Python Module 3 Seed Warning]:', seedModule3Err.message);
 }
 
+// Auto-seed / Verify Python Module 4 with 9 structured lessons & assessments
+try {
+  await seedPythonModule4();
+} catch (seedModule4Err) {
+  console.error('[Server Startup Python Module 4 Seed Warning]:', seedModule4Err.message);
+}
+
 // Auto-seed / Verify R Module 1 with 5 structured lessons
 try {
   await seedRModule1();
@@ -165,4 +173,4 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
 }
 
 export default app;
-
+// Nodemon reload trigger

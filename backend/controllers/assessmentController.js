@@ -67,7 +67,9 @@ export async function getAssessmentDetailHandler(req, res) {
     let targetModuleNumber = 2; // default
     let assessmentType = 'homework';
 
-    if (rawType.includes('module-3') || req.query.module === '3' || req.query.moduleNumber === '3') {
+    if (rawType.includes('module-4') || req.query.module === '4' || req.query.moduleNumber === '4') {
+      targetModuleNumber = 4;
+    } else if (rawType.includes('module-3') || req.query.module === '3' || req.query.moduleNumber === '3') {
       targetModuleNumber = 3;
     } else if (rawType.includes('module-2') || req.query.module === '2' || req.query.moduleNumber === '2') {
       targetModuleNumber = 2;
@@ -169,6 +171,8 @@ export async function submitAssessmentAttemptHandler(req, res) {
     let targetModuleNumber = 2;
     if (moduleNumber) {
       targetModuleNumber = parseInt(moduleNumber, 10);
+    } else if (rawType.includes('module-4') || req.query.module === '4' || req.query.moduleNumber === '4') {
+      targetModuleNumber = 4;
     } else if (rawType.includes('module-3') || req.query.module === '3' || req.query.moduleNumber === '3') {
       targetModuleNumber = 3;
     } else if (rawType.includes('module-2') || req.query.module === '2' || req.query.moduleNumber === '2') {

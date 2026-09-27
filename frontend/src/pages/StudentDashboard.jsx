@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardTopBar from '../components/dashboard/DashboardTopBar';
 import '../components/dashboard/StudentDashboard.css';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function StudentDashboard() {
   const { user } = useContext(AuthContext);
@@ -23,15 +24,14 @@ export default function StudentDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     setError(null);
-    const token = localStorage.getItem('access_token');
 
     try {
-      const res = await fetch('/api/dashboard/student', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
+      const res = await apiFetch('/api/dashboard/student');
 
       if (res.status === 401) {
-        navigate('/login', { state: { from: '/dashboard' } });
+        if (!localStorage.getItem('cached_user')) {
+          navigate('/login', { state: { from: '/dashboard' } });
+        }
         return;
       }
 

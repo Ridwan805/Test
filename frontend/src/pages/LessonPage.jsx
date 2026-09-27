@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import ContentRenderer from '../components/lesson/ContentRenderer';
 import AssessmentWorksheet from '../components/assessment/AssessmentWorksheet';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function LessonPage() {
   const {
@@ -45,17 +46,16 @@ export default function LessonPage() {
       setError(null);
       setIsLocked(false);
       setLockDetails(null);
-      const token = localStorage.getItem('access_token');
 
       try {
-        const res = await fetch(`/api/courses/${courseSlug}/lessons/${lessonSlug}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
+        const res = await apiFetch(`/api/courses/${courseSlug}/lessons/${lessonSlug}`);
 
         if (res.status === 401) {
-          navigate('/login', {
-            state: { from: `/learn/${courseSlug}/module/${moduleNumber}/lesson/${lessonSlug}` }
-          });
+          if (!localStorage.getItem('cached_user')) {
+            navigate('/login', {
+              state: { from: `/learn/${courseSlug}/module/${moduleNumber}/lesson/${lessonSlug}` }
+            });
+          }
           return;
         }
 
@@ -107,11 +107,10 @@ export default function LessonPage() {
     const newStatus = !lessonData.lesson.completed;
 
     try {
-      const res = await fetch(`/api/courses/${courseSlug}/lessons/${lessonSlug}/progress`, {
+      const res = await apiFetch(`/api/courses/${courseSlug}/lessons/${lessonSlug}/progress`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ completed: newStatus })
       });
@@ -229,16 +228,19 @@ export default function LessonPage() {
   const currentModNum = currentModule?.moduleNumber || 1;
   const isModule2 = currentModNum === 2;
   const isModule3 = currentModNum === 3;
-  const isLabModule = isModule2 || isModule3;
+  const isModule4 = currentModNum === 4;
+  const isLabModule = isModule2 || isModule3 || isModule4;
   const isHomeworkLesson =
     lessonSlug === `module-${currentModNum}-homework` ||
     lessonSlug === 'module-2-homework' ||
     lessonSlug === 'module-3-homework' ||
+    lessonSlug === 'module-4-homework' ||
     lessonSlug === 'homework';
   const isQuizLesson =
     lessonSlug === `module-${currentModNum}-coding-quiz` ||
     lessonSlug === 'module-2-coding-quiz' ||
     lessonSlug === 'module-3-coding-quiz' ||
+    lessonSlug === 'module-4-coding-quiz' ||
     lessonSlug === 'coding-quiz';
 
   const handleResetPractice = async () => {
@@ -558,17 +560,21 @@ export default function LessonPage() {
             </div>
 
             <div className="nav-col nav-next">
-              {navigation.next ? (
-                <Link
-                  to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}/lesson/${navigation.next.slug}`}
-                  className={`nav-link-card next ${navigation.next.locked ? 'nav-locked' : ''}`}
-                >
-                  <span className="nav-arrow">
-                    {navigation.next.locked ? '🔒 Next (Complete prior content first)' : 'Next &rarr;'}
-                  </span>
-                  <span className="nav-lesson-name">{navigation.next.title}</span>
-                </Link>
-              ) : (
+              {navigation.next ? (() => {
+                const isMod1 = parseInt(currentModule?.moduleNumber || moduleNumber, 10) === 1;
+                const isLocked = !isMod1 && Boolean(navigation.next.locked);
+                return (
+                  <Link
+                    to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}/lesson/${navigation.next.slug}`}
+                    className={`nav-link-card next ${isLocked ? 'nav-locked' : ''}`}
+                  >
+                    <span className="nav-arrow">
+                      {isLocked ? '🔒 Next (Complete prior content first)' : 'Next →'}
+                    </span>
+                    <span className="nav-lesson-name">{navigation.next.title}</span>
+                  </Link>
+                );
+              })() : (
                 <Link to={`/learn/${courseSlug}/module/${currentModule.moduleNumber}`} className="nav-link-card next">
                   <span className="nav-arrow">Module Syllabus &rarr;</span>
                   <span className="nav-lesson-name">Module 0{currentModule.moduleNumber} Overview</span>

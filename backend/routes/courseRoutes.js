@@ -124,9 +124,10 @@ router.get('/:slug/modules', protect, async (req, res) => {
       progressMap.set(String(p.lessonId), p.completed);
     });
 
-    // Fetch Module 2 and Module 3 grade summaries for progression gating
+    // Fetch Module 2, Module 3, and Module 4 grade summaries for progression gating
     const mod2GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 2);
     const mod3GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 3);
+    const mod4GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 4);
 
     const curriculum = modules.map((m) => {
       const mObj = m.toJSON();
@@ -150,10 +151,15 @@ router.get('/:slug/modules', protect, async (req, res) => {
         mObj.isLocked = !mod2GradeSummary.passed && !req.user.is_staff;
         mObj.lockReason = 'Complete Module 2 with at least 80% to unlock.';
         mObj.gradeSummary = mod3GradeSummary;
-      } else if (m.moduleNumber >= 4) {
+      } else if (m.moduleNumber === 4) {
         mObj.hasGradeRequirement = true;
         mObj.isLocked = (!mod2GradeSummary.passed || !mod3GradeSummary.passed) && !req.user.is_staff;
         mObj.lockReason = 'Complete Module 3 with at least 80% to unlock.';
+        mObj.gradeSummary = mod4GradeSummary;
+      } else if (m.moduleNumber >= 5) {
+        mObj.hasGradeRequirement = true;
+        mObj.isLocked = (!mod2GradeSummary.passed || !mod3GradeSummary.passed || !mod4GradeSummary.passed) && !req.user.is_staff;
+        mObj.lockReason = 'Complete Module 4 with at least 80% to unlock.';
       }
       return mObj;
     });
@@ -174,6 +180,7 @@ router.get('/:slug/modules', protect, async (req, res) => {
       curriculum,
       module2GradeSummary: mod2GradeSummary,
       module3GradeSummary: mod3GradeSummary,
+      module4GradeSummary: mod4GradeSummary,
       totalLessons: lessons.length,
       completedLessons: completedCount,
       progressPercentage
@@ -217,8 +224,8 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
       }
     }
 
-    // Module 4+ requires Module 3 grade >= 80%
-    if (moduleNumber >= 4 && !req.user.is_staff) {
+    // Module 4 requires Module 3 grade >= 80%
+    if (moduleNumber === 4 && !req.user.is_staff) {
       const mod3Grade = await getModuleGradeSummary(req.user._id, course._id, 3);
       if (!mod3Grade.passed) {
         return res.status(403).json({
@@ -229,6 +236,22 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
           requiredGrade: 80,
           homeworkPercentage: mod3Grade.homework.bestPercentage,
           quizPercentage: mod3Grade.quiz.bestPercentage
+        });
+      }
+    }
+
+    // Module 5+ requires Module 4 grade >= 80%
+    if (moduleNumber >= 5 && !req.user.is_staff) {
+      const mod4Grade = await getModuleGradeSummary(req.user._id, course._id, 4);
+      if (!mod4Grade.passed) {
+        return res.status(403).json({
+          detail: 'Module 5 is locked. Complete Module 4 with at least 80% to continue.',
+          locked: true,
+          moduleNumber,
+          module4Grade: mod4Grade.moduleGrade,
+          requiredGrade: 80,
+          homeworkPercentage: mod4Grade.homework.bestPercentage,
+          quizPercentage: mod4Grade.quiz.bestPercentage
         });
       }
     }
@@ -247,6 +270,7 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
 
     const mod2GradeSummary = moduleNumber === 2 ? await getModuleGradeSummary(req.user._id, course._id, 2) : null;
     const mod3GradeSummary = moduleNumber === 3 ? await getModuleGradeSummary(req.user._id, course._id, 3) : null;
+    const mod4GradeSummary = moduleNumber === 4 ? await getModuleGradeSummary(req.user._id, course._id, 4) : null;
 
     res.json({
       course: {
@@ -259,7 +283,8 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
       module: moduleDoc,
       lessons: lessonsWithProgress,
       module2GradeSummary: mod2GradeSummary,
-      module3GradeSummary: mod3GradeSummary
+      module3GradeSummary: mod3GradeSummary,
+      module4GradeSummary: mod4GradeSummary
     });
   } catch (error) {
     console.error('Fetch Module Error:', error.message);
@@ -367,8 +392,9 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
       published: true
     });
     let hwBestPercent = 0;
+    let hwAttempts = [];
     if (hwAssessment) {
-      const hwAttempts = await AssessmentAttempt.find({
+      hwAttempts = await AssessmentAttempt.find({
         userId: req.user._id,
         assessmentId: hwAssessment._id
       });
@@ -423,7 +449,7 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
       };
     });
 
-    if (moduleDoc && (moduleDoc.moduleNumber === 2 || moduleDoc.moduleNumber === 3)) {
+    if (moduleDoc && (moduleDoc.moduleNumber >= 2)) {
       const modNum = moduleDoc.moduleNumber;
       const lesson8 = allModuleLessons.find((l) => l.lessonNumber === 8);
       const lesson8Completed = lesson8 ? (progressMap.get(String(lesson8._id)) || false) : false;
@@ -431,7 +457,8 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
 
       const lastLesson = allModuleLessons[allModuleLessons.length - 1];
       const lastLessonCompleted = lastLesson ? (progressMap.get(String(lastLesson._id)) || false) : false;
-      const quizLocked = !req.user.is_staff && (!hwPassed || !lastLessonCompleted);
+      const hasHwAttempts = hwAttempts && hwAttempts.length > 0;
+      const quizLocked = !req.user.is_staff && (modNum >= 4 ? (!hasHwAttempts || !lastLessonCompleted) : (!hwPassed || !lastLessonCompleted));
 
       sidebarLessons.push({
         id: `module-${modNum}-hw-sidebar`,
@@ -439,7 +466,7 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
         slug: `module-${modNum}-homework`,
         lessonNumber: 11,
         estimatedMinutes: 30,
-        completed: hwPassed,
+        completed: modNum >= 4 ? hasHwAttempts : hwPassed,
         isAssessment: true,
         isCurrent: lessonSlug === `module-${modNum}-homework`,
         locked: hwLocked,
@@ -456,7 +483,9 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
         isAssessment: true,
         isCurrent: lessonSlug === `module-${modNum}-coding-quiz`,
         locked: quizLocked,
-        lockReason: !hwPassed ? 'Requires Homework (≥80%)' : (quizLocked ? 'Requires all lessons' : '')
+        lockReason: modNum >= 4
+          ? (!hasHwAttempts ? 'Requires Homework submission' : (quizLocked ? 'Requires all lessons' : ''))
+          : (!hwPassed ? 'Requires Homework (≥80%)' : (quizLocked ? 'Requires all lessons' : ''))
       });
     }
 
@@ -472,7 +501,7 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
       const lesson8 = allModuleLessons.find((l) => l.lessonNumber === 8);
       const lesson9 = allModuleLessons.find((l) => l.lessonNumber === 9);
       if (lesson8) prevNav = { title: `Lesson 8: ${lesson8.title}`, slug: lesson8.slug, lessonNumber: 8 };
-      if (lesson9) nextNav = { title: `Lesson 9: ${lesson9.title}`, slug: lesson9.slug, lessonNumber: 9, locked: !hwPassed };
+      if (lesson9) nextNav = { title: `Lesson 9: ${lesson9.title}`, slug: lesson9.slug, lessonNumber: 9, locked: (modNum >= 4 ? false : !hwPassed) };
     } else if (isQuiz) {
       const lastL = allModuleLessons[allModuleLessons.length - 1];
       if (lastL) prevNav = { title: `Lesson ${lastL.lessonNumber}: ${lastL.title}`, slug: lastL.slug, lessonNumber: lastL.lessonNumber };
@@ -481,7 +510,7 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
       const currentIndex = allModuleLessons.findIndex((l) => String(l._id) === String(lesson._id));
       const curL = currentIndex >= 0 ? allModuleLessons[currentIndex] : null;
 
-      if (curL && curL.lessonNumber === 8 && (modNum === 2 || modNum === 3)) {
+      if (curL && curL.lessonNumber === 8 && (modNum === 2 || modNum === 3 || modNum === 4)) {
         prevNav = currentIndex > 0 ? { title: allModuleLessons[currentIndex - 1].title, slug: allModuleLessons[currentIndex - 1].slug, lessonNumber: allModuleLessons[currentIndex - 1].lessonNumber } : null;
         nextNav = {
           title: `Module ${modNum} Official Homework (Graded)`,
@@ -497,6 +526,19 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
         };
         const nextL = allModuleLessons.find((l) => l.lessonNumber === 10);
         nextNav = nextL ? { title: nextL.title, slug: nextL.slug, lessonNumber: 10, locked: !isCompleted } : null;
+      } else if (curL && curL.lessonNumber === 9 && modNum === 4) {
+        prevNav = {
+          title: `Module ${modNum} Official Homework (Graded)`,
+          slug: `module-${modNum}-homework`,
+          isAssessment: true
+        };
+        const hasHwAttempts = hwAttempts && hwAttempts.length > 0;
+        nextNav = {
+          title: `Module ${modNum} Final Coding Quiz (Graded)`,
+          slug: `module-${modNum}-coding-quiz`,
+          isAssessment: true,
+          locked: !isCompleted || !hasHwAttempts
+        };
       } else if (curL && curL.lessonNumber === 10 && (modNum === 2 || modNum === 3)) {
         const prevL = allModuleLessons.find((l) => l.lessonNumber === 9);
         prevNav = prevL ? { title: prevL.title, slug: prevL.slug, lessonNumber: 9 } : null;
@@ -508,7 +550,7 @@ router.get('/:slug/lessons/:lessonSlug', protect, async (req, res) => {
         };
       } else {
         prevNav = currentIndex > 0 ? { title: allModuleLessons[currentIndex - 1].title, slug: allModuleLessons[currentIndex - 1].slug, lessonNumber: allModuleLessons[currentIndex - 1].lessonNumber } : null;
-        nextNav = currentIndex >= 0 && currentIndex < allModuleLessons.length - 1 ? { title: allModuleLessons[currentIndex + 1].title, slug: allModuleLessons[currentIndex + 1].slug, lessonNumber: allModuleLessons[currentIndex + 1].lessonNumber, locked: !isCompleted } : null;
+        nextNav = currentIndex >= 0 && currentIndex < allModuleLessons.length - 1 ? { title: allModuleLessons[currentIndex + 1].title, slug: allModuleLessons[currentIndex + 1].slug, lessonNumber: allModuleLessons[currentIndex + 1].lessonNumber, locked: (modNum <= 1 ? false : !isCompleted) } : null;
       }
     }
 
