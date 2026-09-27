@@ -95,23 +95,7 @@ export default function Courses() {
         </p>
       </header>
 
-      {/* Distinction Banner: Courses vs Bootcamps */}
-      <div className="track-distinction-banner">
-        <div className="distinction-left">
-          <div className="distinction-icon">💡</div>
-          <div className="distinction-text">
-            <h3>Looking for Hands-on Programming Bootcamps?</h3>
-            <p>
-              We treat our academic courses and computational bootcamps separately. For 6-week cohort intensives in Python and R with interactive code labs and 100% free tuition, visit our Applied Bootcamps section.
-            </p>
-          </div>
-        </div>
-        <div className="distinction-actions">
-          <Link to="/bootcamp" className="btn btn-primary">
-            Explore Applied Bootcamps →
-          </Link>
-        </div>
-      </div>
+
 
       {/* Academic Courses Grid */}
       <div className="academic-catalog-grid">
