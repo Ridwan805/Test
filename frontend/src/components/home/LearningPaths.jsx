@@ -26,9 +26,6 @@ export default function LearningPaths() {
               <h3 id="course-card-heading" className="card-heading">
                 Explore Our Courses
               </h3>
-              <p className="card-description">
-                Study subjects through carefully structured modules combining theory, intuition, formulas, visualizations, examples, exercises, and interactive learning.
-              </p>
 
               <div className="card-topics" aria-label="Course Topics">
                 <span className="topic-tag">Statistics</span>
@@ -56,9 +53,6 @@ export default function LearningPaths() {
               <h3 id="bootcamp-card-heading" className="card-heading">
                 Learn Through Guided Practice
               </h3>
-              <p className="card-description">
-                Follow practical learning pathways designed to turn concepts into skills through guided exercises, projects, and progressive challenges.
-              </p>
 
               <div className="card-topics" aria-label="Bootcamp Focus Areas">
                 <span className="topic-tag">Practical Labs</span>
