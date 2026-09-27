@@ -235,38 +235,7 @@ export default function Bootcamp() {
         })}
       </div>
 
-      {/* The EcoIntuition Bootcamp Experience Section */}
-      <section className="bootcamp-perks-section">
-        <h3 className="sub-heading" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-          The EcoIntuition Bootcamp Experience
-        </h3>
-        <p style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto 2rem auto', color: 'var(--color-muted)' }}>
-          Our cohort model is engineered to provide academic rigor without financial barriers.
-        </p>
 
-        <div className="perks-grid">
-          <div className="perk-card">
-            <div className="perk-icon">📚</div>
-            <h4>100% Free Tuition</h4>
-            <p>Every bootcamp is completely free for authenticated scholars. No credit card required.</p>
-          </div>
-          <div className="perk-card">
-            <div className="perk-icon">⚡</div>
-            <h4>Rigorous Applied Focus</h4>
-            <p>Bridge intuition and execution with real datasets, reproducible scripts, and econometric rigor.</p>
-          </div>
-          <div className="perk-card">
-            <div className="perk-icon">💻</div>
-            <h4>Interactive Code Labs</h4>
-            <p>Step-by-step interactive lessons with code execution snippets, best practice notes, and exercises.</p>
-          </div>
-          <div className="perk-card">
-            <div className="perk-icon">📜</div>
-            <h4>Verifiable Credentials</h4>
-            <p>Receive a verified digital certificate of completion upon successfully finishing all modules.</p>
-          </div>
-        </div>
-      </section>
 
       {/* Scholar Bottom Callout */}
       {!user && (
