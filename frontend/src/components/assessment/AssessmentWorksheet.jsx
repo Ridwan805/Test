@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import {
   runPythonCode,
@@ -19,7 +19,7 @@ export default function AssessmentWorksheet({
   onSubmitted = () => {}
 }) {
   const { user } = useContext(AuthContext);
-  const isAdmin = Boolean(user?.is_staff);
+  const isAdmin = Boolean(user?.is_staff || localStorage.getItem('user_is_staff') === 'true');
 
   const targetMod = parseInt(moduleNumber, 10) || 2;
   const isMod4 = targetMod === 4;
@@ -47,14 +47,33 @@ export default function AssessmentWorksheet({
   // Submission & Notebook state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
-  const [viewMode, setViewMode] = useState(isHomework ? 'notebook' : 'cards');
+  const [viewMode, setViewMode] = useState('notebook');
   const [gradingStep, setGradingStep] = useState('');
   const [notebookKey, setNotebookKey] = useState(0);
 
+  // Quiz Timer & Admin Controls State
+  const timeLimitMinutes = assessmentData?.assessment?.timeLimitMinutes ?? 30;
+  const [timeRemaining, setTimeRemaining] = useState(timeLimitMinutes * 60);
+  const [timerActive, setTimerActive] = useState(!isHomework);
+  const [showAdminControls, setShowAdminControls] = useState(false);
+  const [adminMinutes, setAdminMinutes] = useState(30);
+  const [isSavingTimer, setIsSavingTimer] = useState(false);
+  const [adminTimerMsg, setAdminTimerMsg] = useState('');
+  const hasAutoSubmittedRef = useRef(false);
+  const handleNotebookSubmitRef = useRef();
+  const handleSubmitRef = useRef();
+
   useEffect(() => {
-    setViewMode(isHomework ? 'notebook' : 'cards');
+    setViewMode('notebook');
     setSubmissionResult(null);
+    hasAutoSubmittedRef.current = false;
   }, [assessmentType, moduleNumber]);
+
+  useEffect(() => {
+    if (assessmentData?.assessment?.timeLimitMinutes !== undefined) {
+      setAdminMinutes(assessmentData.assessment.timeLimitMinutes);
+    }
+  }, [assessmentData]);
 
   // Fetch assessment metadata and previous attempts
   useEffect(() => {
@@ -292,6 +311,7 @@ export default function AssessmentWorksheet({
         });
       }
 
+      setTimerActive(false);
       onSubmitted(data);
     } catch (err) {
       alert(`Submission error: ${err.message}`);
@@ -301,10 +321,6 @@ export default function AssessmentWorksheet({
         document.getElementById('assessment-results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
-  };
-
-  const handleRetry = () => {
-    setSubmissionResult(null);
   };
 
   const handleNotebookSubmit = async () => {
@@ -330,7 +346,7 @@ export default function AssessmentWorksheet({
       const nb = await getJupyterNotebookContent(notebookPath);
       if (!nb) {
         throw new Error(
-          'Could not find your homework notebook in workspace storage. Please make sure the notebook is loaded and you have tested your cells.'
+          `Could not find your ${isHomework ? 'homework' : 'quiz'} notebook in workspace storage. Please make sure the notebook is loaded and you have tested your cells.`
         );
       }
 
@@ -344,11 +360,17 @@ export default function AssessmentWorksheet({
       setGradingStep('Running automated grading test suite in WebAssembly...');
       let questionResults;
       if (isMod4) {
-        questionResults = await gradeModule4Homework(extractedCode);
+        questionResults = isHomework
+          ? await gradeModule4Homework(extractedCode)
+          : await gradeModule4Quiz(extractedCode);
       } else if (isMod3) {
-        questionResults = await gradeModule3Homework(extractedCode);
+        questionResults = isHomework
+          ? await gradeModule3Homework(extractedCode)
+          : await gradeModule3Quiz(extractedCode);
       } else {
-        questionResults = await gradeHomework(extractedCode);
+        questionResults = isHomework
+          ? await gradeHomework(extractedCode)
+          : await gradeCodingQuiz(extractedCode);
       }
 
       setGradingStep('Recording official score and course progression...');
@@ -385,6 +407,7 @@ export default function AssessmentWorksheet({
         });
       }
 
+      setTimerActive(false);
       onSubmitted(data);
     } catch (err) {
       alert(`Grading error: ${err.message}`);
@@ -396,6 +419,127 @@ export default function AssessmentWorksheet({
       }, 100);
     }
   };
+
+  // Keep refs current for countdown interval
+  handleNotebookSubmitRef.current = handleNotebookSubmit;
+  handleSubmitRef.current = handleSubmit;
+
+  // Initialize and track quiz timer in localStorage
+  useEffect(() => {
+    if (isHomework) return;
+    const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
+    const totalSecs = (assessmentData?.assessment?.timeLimitMinutes ?? 30) * 60;
+    const stored = localStorage.getItem(timerKey);
+    let initialSecs = totalSecs;
+
+    if (stored) {
+      const startTime = parseInt(stored, 10);
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      initialSecs = Math.max(0, totalSecs - elapsed);
+    } else {
+      localStorage.setItem(timerKey, Date.now().toString());
+    }
+
+    setTimeRemaining(initialSecs);
+    setTimerActive(initialSecs > 0 && !submissionResult);
+  }, [assessmentType, targetMod, courseSlug, assessmentData?.assessment?.timeLimitMinutes, isHomework, submissionResult]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (isHomework || !timerActive || submissionResult || isSubmitting) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setTimerActive(false);
+          if (!hasAutoSubmittedRef.current) {
+            hasAutoSubmittedRef.current = true;
+            alert('⏰ Quiz time has expired! Your answers are being submitted automatically for official grading.');
+            if (viewMode === 'notebook') {
+              handleNotebookSubmitRef.current?.();
+            } else {
+              handleSubmitRef.current?.();
+            }
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isHomework, timerActive, submissionResult, isSubmitting, viewMode]);
+
+  const handleRetry = () => {
+    setSubmissionResult(null);
+    hasAutoSubmittedRef.current = false;
+    if (!isHomework) {
+      const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
+      localStorage.setItem(timerKey, Date.now().toString());
+      setTimeRemaining((assessmentData?.assessment?.timeLimitMinutes || 30) * 60);
+      setTimerActive(true);
+    }
+  };
+
+  const handleSaveTimer = async () => {
+    setIsSavingTimer(true);
+    setAdminTimerMsg('');
+    try {
+      const res = await apiFetch(`/api/courses/${courseSlug}/assessments/${assessmentType}/timer`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timeLimitMinutes: adminMinutes,
+          moduleNumber: targetMod
+        })
+      });
+      if (!res.ok) throw new Error('Failed to update timer on server');
+      const data = await res.json();
+      setAssessmentData((prev) => ({
+        ...prev,
+        assessment: {
+          ...prev.assessment,
+          timeLimitMinutes: data.timeLimitMinutes
+        }
+      }));
+      const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
+      localStorage.setItem(timerKey, Date.now().toString());
+      setTimeRemaining(data.timeLimitMinutes * 60);
+      setTimerActive(true);
+      hasAutoSubmittedRef.current = false;
+      setAdminTimerMsg(`✓ Saved! Quiz timer set to ${data.timeLimitMinutes}m.`);
+      setTimeout(() => setAdminTimerMsg(''), 4000);
+    } catch (err) {
+      setAdminTimerMsg(`Error: ${err.message}`);
+    } finally {
+      setIsSavingTimer(false);
+    }
+  };
+
+  const handleResetStudentTimer = () => {
+    const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
+    localStorage.setItem(timerKey, Date.now().toString());
+    const limitMins = assessmentData?.assessment?.timeLimitMinutes ?? 30;
+    setTimeRemaining(limitMins * 60);
+    setTimerActive(true);
+    hasAutoSubmittedRef.current = false;
+    setAdminTimerMsg('✓ Timer reset to full duration.');
+    setTimeout(() => setAdminTimerMsg(''), 4000);
+  };
+
+  const formatTimer = (secs) => {
+    if (secs <= 0) return '00:00';
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const timerStatusClass = timeRemaining <= 120
+    ? 'timer-urgent'
+    : timeRemaining <= 300
+    ? 'timer-warning'
+    : 'timer-normal';
 
   if (loading) {
     return (
@@ -469,21 +613,38 @@ export default function AssessmentWorksheet({
   return (
     <div className="assessment-worksheet">
       {/* Assessment Header Card / Top Control Bar */}
-      {isHomework && viewMode === 'notebook' ? (
+      {viewMode === 'notebook' ? (
         <div className="worksheet-header-card homework-integrated-header">
           <div className="worksheet-header-top">
             <div className="worksheet-badges">
               <span className="pill-badge pill-type">INTEGRATED JUPYTER NOTEBOOK</span>
-              <span className="pill-badge pill-level">WEIGHT: 40%</span>
+              <span className="pill-badge pill-level">
+                {isHomework ? 'WEIGHT: 40%' : 'WEIGHT: 60%'}
+              </span>
               <span className="pill-badge pill-points">MAX: {assessment.maxPoints} MARKS</span>
               {bestScore > 0 && (
                 <span className="pill-badge pill-best">
                   BEST: {bestScore} / {assessment.maxPoints} ({bestPercentage}%)
                 </span>
               )}
+              {!isHomework && (
+                <span className={`pill-badge quiz-timer-pill ${timerStatusClass}`} title="Time remaining for this quiz">
+                  ⏱️ {formatTimer(timeRemaining)}
+                </span>
+              )}
             </div>
 
             <div className="header-action-links">
+              {isAdmin && !isHomework && (
+                <button
+                  type="button"
+                  className="btn-open-notebook-tab"
+                  onClick={() => setShowAdminControls((s) => !s)}
+                  title="Configure quiz timer settings"
+                >
+                  ⚙️ Admin Timer
+                </button>
+              )}
               <a
                 href={fullNotebookUrl}
                 target="_blank"
@@ -512,11 +673,52 @@ export default function AssessmentWorksheet({
             </div>
           </div>
 
+          {/* Admin Timer Control Bar */}
+          {isAdmin && !isHomework && showAdminControls && (
+            <div className="admin-timer-controls-bar">
+              <div className="admin-timer-header-info">
+                <span className="admin-shield-icon">🛡️</span>
+                <span>Admin Quiz Controls</span>
+              </div>
+              <div className="admin-timer-form">
+                <label className="admin-timer-label">Duration:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  className="admin-timer-input"
+                  value={adminMinutes}
+                  onChange={(e) => setAdminMinutes(e.target.value)}
+                  disabled={isSavingTimer}
+                />
+                <span className="admin-timer-label">minutes</span>
+                <button
+                  type="button"
+                  className="btn-save-admin-timer"
+                  onClick={handleSaveTimer}
+                  disabled={isSavingTimer}
+                >
+                  {isSavingTimer ? 'Saving...' : '💾 Save Duration'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-reset-admin-timer"
+                  onClick={handleResetStudentTimer}
+                >
+                  ↺ Reset Timer
+                </button>
+                {adminTimerMsg && <span className="admin-timer-msg">{adminTimerMsg}</span>}
+              </div>
+            </div>
+          )}
+
           <div className="homework-eval-main-row">
             <div className="eval-main-text">
               <h1 className="worksheet-title">{assessment.title}</h1>
               <p className="worksheet-description">
-                Solve your homework problems directly inside the integrated Jupyter Notebook below. Use <strong>Shift + Enter</strong> to run cells. When finished, scroll down and click <strong>Submit & Grade Notebook</strong> to calculate and save your official score.
+                {isHomework
+                  ? 'Solve your homework problems directly inside the integrated Jupyter Notebook below. Use Shift + Enter to run cells. When finished, scroll down and click Submit & Grade Notebook to calculate and save your official score.'
+                  : `Solve your official coding quiz problems directly inside the integrated Jupyter Notebook below within the allotted time (${assessment.timeLimitMinutes || 30} minutes). Use Shift + Enter to run cells. When finished, scroll down and click Submit & Grade Quiz to calculate and save your official score.`}
               </p>
             </div>
           </div>
@@ -537,18 +739,31 @@ export default function AssessmentWorksheet({
                   BEST: {bestScore} / {assessment.maxPoints} ({bestPercentage}%)
                 </span>
               )}
+              {!isHomework && (
+                <span className={`pill-badge quiz-timer-pill ${timerStatusClass}`} title="Time remaining for this quiz">
+                  ⏱️ {formatTimer(timeRemaining)}
+                </span>
+              )}
             </div>
             <div className="header-action-links">
-              {isHomework && (
+              {isAdmin && !isHomework && (
                 <button
                   type="button"
                   className="btn-open-notebook-tab"
-                  onClick={() => setViewMode('notebook')}
-                  title="Switch to integrated Jupyter Notebook"
+                  onClick={() => setShowAdminControls((s) => !s)}
+                  title="Configure quiz timer settings"
                 >
-                  📓 Notebook View
+                  ⚙️ Admin Timer
                 </button>
               )}
+              <button
+                type="button"
+                className="btn-open-notebook-tab"
+                onClick={() => setViewMode('notebook')}
+                title="Switch to integrated Jupyter Notebook"
+              >
+                📓 Notebook View
+              </button>
               <a
                 href={fullNotebookUrl}
                 target="_blank"
@@ -561,20 +776,59 @@ export default function AssessmentWorksheet({
             </div>
           </div>
 
+          {/* Admin Timer Control Bar */}
+          {isAdmin && !isHomework && showAdminControls && (
+            <div className="admin-timer-controls-bar">
+              <div className="admin-timer-header-info">
+                <span className="admin-shield-icon">🛡️</span>
+                <span>Admin Quiz Controls</span>
+              </div>
+              <div className="admin-timer-form">
+                <label className="admin-timer-label">Duration:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  className="admin-timer-input"
+                  value={adminMinutes}
+                  onChange={(e) => setAdminMinutes(e.target.value)}
+                  disabled={isSavingTimer}
+                />
+                <span className="admin-timer-label">minutes</span>
+                <button
+                  type="button"
+                  className="btn-save-admin-timer"
+                  onClick={handleSaveTimer}
+                  disabled={isSavingTimer}
+                >
+                  {isSavingTimer ? 'Saving...' : '💾 Save Duration'}
+                </button>
+                <button
+                  type="button"
+                  className="btn-reset-admin-timer"
+                  onClick={handleResetStudentTimer}
+                >
+                  ↺ Reset Timer
+                </button>
+                {adminTimerMsg && <span className="admin-timer-msg">{adminTimerMsg}</span>}
+              </div>
+            </div>
+          )}
+
           <h1 className="worksheet-title">{assessment.title}</h1>
           <p className="worksheet-description">{assessment.description}</p>
 
           <div className="worksheet-notice">
             <span className="notice-icon">ℹ️</span>
             <span>
-              <strong>Distraction-Free Coding Worksheet:</strong> Enter your solution in each designated answer cell below, click <strong>Run Code</strong> to test, and click <strong>Submit {isHomework ? 'Homework' : 'Coding Quiz'}</strong> when complete. You may retry to improve your score.
+              <strong>Distraction-Free Coding Worksheet:</strong> Enter your solution in each designated answer cell below, click <strong>Run Code</strong> to test, and click <strong>Submit {isHomework ? 'Homework' : 'Coding Quiz'}</strong> when complete. {!isHomework && `Allotted time: ${assessment.timeLimitMinutes || 30} minutes.`}
             </span>
           </div>
         </div>
       )}
 
       {/* Integrated Jupyter Notebook Mode vs Classic Questions Form */}
-      {isHomework && viewMode === 'notebook' ? (
+      {viewMode === 'notebook' ? (
         <div className="integrated-jupyter-workspace-wrapper">
           <div className="jupyter-workspace-meta-banner">
             <div className="meta-banner-left">
@@ -583,7 +837,12 @@ export default function AssessmentWorksheet({
                 EcoIntuition Academy Integrated Notebook &bull; <strong>{notebookPath}</strong>
               </span>
             </div>
-            <div className="meta-banner-right">
+            <div className="meta-banner-right" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              {!isHomework && (
+                <span className={`quiz-meta-timer-bar ${timerStatusClass}`}>
+                  ⏱️ <strong>{formatTimer(timeRemaining)}</strong>
+                </span>
+              )}
               <span className="meta-tip">
                 💡 Tip: Solve problems inside the notebook. Run with <strong>Shift + Enter</strong>.
               </span>
@@ -603,9 +862,11 @@ export default function AssessmentWorksheet({
 
           <div className="notebook-bottom-submit-banner">
             <div className="bottom-submit-info">
-              <h4>Ready to evaluate your homework?</h4>
+              <h4>Ready to evaluate your {isHomework ? 'homework' : 'coding quiz'}?</h4>
               <p>
-                Clicking Submit extracts all student code cells from the notebook, runs the official automated grading suite, and updates your marks and course progression.
+                {isHomework
+                  ? 'Clicking Submit extracts all student code cells from the notebook, runs the official automated grading suite, and updates your marks and course progression.'
+                  : 'Clicking Submit extracts all answers from your quiz notebook, evaluates test cases against official grading assertions, records your final score, and updates your course progression.'}
               </p>
             </div>
             <button
@@ -620,7 +881,7 @@ export default function AssessmentWorksheet({
                   <span>{gradingStep || 'Grading Notebook...'}</span>
                 </>
               ) : (
-                `🚀 Submit & Grade Notebook (${assessment.maxPoints} Marks) →`
+                `🚀 Submit & Grade ${isHomework ? 'Homework' : 'Quiz'} Notebook (${assessment.maxPoints} Marks) →`
               )}
             </button>
           </div>

@@ -5741,3 +5741,182 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 14px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
+
+/* ==========================================================================
+   Quiz Countdown Timer & Admin Controls
+   ========================================================================== */
+.quiz-timer-pill {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  letter-spacing: 0.03em;
+  font-size: 0.82rem;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  transition: all 0.25s ease;
+}
+
+.quiz-timer-pill.timer-normal {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1.5px solid #10B981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+}
+
+.quiz-timer-pill.timer-warning {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1.5px solid #F59E0B;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+}
+
+.quiz-timer-pill.timer-urgent {
+  background: #FEF2F2;
+  color: #991B1B;
+  border: 1.5px solid #EF4444;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+  animation: pulse-timer-badge 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-timer-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.quiz-meta-timer-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.quiz-meta-timer-bar.timer-normal {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.quiz-meta-timer-bar.timer-warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FCD34D;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.quiz-meta-timer-bar.timer-urgent {
+  background: rgba(239, 68, 68, 0.25);
+  color: #FCA5A5;
+  border: 1px solid rgba(248, 113, 113, 0.6);
+  animation: pulse-timer-badge 1.2s infinite ease-in-out;
+}
+
+.admin-timer-controls-bar {
+  margin-top: 1rem;
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-left: 4px solid #3B82F6;
+  border-radius: 8px;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.admin-timer-header-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #1E293B;
+  font-weight: 600;
+}
+
+.admin-shield-icon {
+  font-size: 1.1rem;
+}
+
+.admin-timer-form {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.admin-timer-label {
+  font-size: 0.85rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.admin-timer-input {
+  width: 72px;
+  padding: 0.4rem 0.6rem;
+  border: 1.5px solid #94A3B8;
+  border-radius: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+  color: #0F172A;
+  background: #FFFFFF;
+}
+
+.admin-timer-input:focus {
+  outline: none;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.btn-save-admin-timer {
+  background: #2563EB;
+  color: #FFFFFF;
+  border: 1px solid #1D4ED8;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-save-admin-timer:hover:not(:disabled) {
+  background: #1D4ED8;
+}
+
+.btn-reset-admin-timer {
+  background: #FFFFFF;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-admin-timer:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.admin-timer-msg {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #16A34A;
+  margin-left: 0.25rem;
+}
+

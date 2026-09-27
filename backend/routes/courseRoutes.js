@@ -14,7 +14,8 @@ import {
 import {
   getModuleGradeHandler,
   getAssessmentDetailHandler,
-  submitAssessmentAttemptHandler
+  submitAssessmentAttemptHandler,
+  updateAssessmentTimerHandler
 } from '../controllers/assessmentController.js';
 
 const router = express.Router();
@@ -707,5 +708,9 @@ router.get('/:slug/assessments/:type', protect, getAssessmentDetailHandler);
 // @route   POST /api/courses/:slug/assessments/:type/submit
 // @desc    Submit assessment attempt, save result, recalculate module grade
 router.post('/:slug/assessments/:type/submit', protect, submitAssessmentAttemptHandler);
+
+// @route   PUT /api/courses/:slug/assessments/:type/timer
+// @desc    Admin: update assessment timer duration in minutes
+router.put('/:slug/assessments/:type/timer', protect, updateAssessmentTimerHandler);
 
 export default router;

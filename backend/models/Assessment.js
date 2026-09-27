@@ -49,6 +49,10 @@ const assessmentSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  timeLimitMinutes: {
+    type: Number,
+    default: 30
+  },
   questions: [
     {
       id: { type: String, required: true },

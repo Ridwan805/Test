@@ -271,3 +271,79 @@ export async function submitAssessmentAttemptHandler(req, res) {
     res.status(500).json({ detail: 'Error submitting assessment attempt' });
   }
 }
+
+/**
+ * Controller: PUT /api/courses/:slug/assessments/:type/timer
+ * Body: { timeLimitMinutes, moduleNumber }
+ * Restricted to staff / admin users
+ */
+export async function updateAssessmentTimerHandler(req, res) {
+  try {
+    if (!req.user || !req.user.is_staff) {
+      return res.status(403).json({ detail: 'Admin privileges required' });
+    }
+
+    const courseSlug = cleanSlug(req.params.slug);
+    const rawType = req.params.type.toLowerCase();
+    const { timeLimitMinutes, moduleNumber } = req.body;
+
+    const course = await Course.findOne({
+      slug: courseSlug,
+      $or: [{ published: true }, { is_published: true }]
+    });
+
+    if (!course) {
+      return res.status(404).json({ detail: 'Course not found' });
+    }
+
+    let targetModuleNumber = 2;
+    if (moduleNumber) {
+      targetModuleNumber = parseInt(moduleNumber, 10);
+    } else if (rawType.includes('module-4') || req.query.module === '4') {
+      targetModuleNumber = 4;
+    } else if (rawType.includes('module-3') || req.query.module === '3') {
+      targetModuleNumber = 3;
+    } else if (rawType.includes('module-2') || req.query.module === '2') {
+      targetModuleNumber = 2;
+    }
+
+    const assessmentType = rawType.includes('homework') ? 'homework' : 'quiz';
+
+    const moduleDoc = await Module.findOne({ courseId: course._id, moduleNumber: targetModuleNumber });
+    let assessment = null;
+
+    if (moduleDoc) {
+      assessment = await Assessment.findOne({
+        courseId: course._id,
+        moduleId: moduleDoc._id,
+        type: assessmentType
+      });
+    }
+
+    if (!assessment) {
+      assessment = await Assessment.findOne({
+        courseId: course._id,
+        $or: [{ slug: rawType }, { type: assessmentType }]
+      });
+    }
+
+    if (!assessment) {
+      return res.status(404).json({ detail: 'Assessment not found' });
+    }
+
+    const newMinutes = Math.max(0, parseInt(timeLimitMinutes, 10) || 0);
+    assessment.timeLimitMinutes = newMinutes;
+    await assessment.save();
+
+    res.json({
+      success: true,
+      message: `Timer set to ${newMinutes} minutes for ${assessment.title}`,
+      timeLimitMinutes: newMinutes,
+      assessment
+    });
+  } catch (error) {
+    console.error('Update Assessment Timer Error:', error);
+    res.status(500).json({ detail: 'Failed to update assessment timer' });
+  }
+}
+
