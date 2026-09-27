@@ -139,27 +139,7 @@ export default function Bootcamp() {
         </p>
       </header>
 
-      {/* Info Highlight Banner */}
-      <div className="bootcamp-info-banner">
-        <div className="info-banner-left">
-          <div className="info-banner-icon">🎓</div>
-          <div className="info-banner-text">
-            <h3>Open Scholar Admissions</h3>
-            <p>
-              All foundational bootcamps are fully sponsored and accessible to registered scholars. Select a track below to begin your studies.
-            </p>
-          </div>
-        </div>
-        <div className="bootcamp-card-badges">
-          <span className="badge-admissions">OPEN ENROLLMENT</span>
-          <span className="badge-free">100% FREE TUITION</span>
-          {user && (
-            <span className="badge-cohort" style={{ backgroundColor: '#1F3A5F' }}>
-              SCHOLAR: {user.first_name ? user.first_name.toUpperCase() : 'ACTIVE'}
-            </span>
-          )}
-        </div>
-      </div>
+
 
       {/* Bootcamps Catalog Grid */}
       <div className="bootcamp-catalog-grid">
