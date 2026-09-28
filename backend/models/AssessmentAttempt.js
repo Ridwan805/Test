@@ -85,6 +85,22 @@ const assessmentAttemptSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     default: {}
   },
+  startedAt: {
+    type: Date
+  },
+  expiresAt: {
+    type: Date
+  },
+  submissionReason: {
+    type: String,
+    enum: ['manual', 'time_expired'],
+    default: 'manual'
+  },
+  status: {
+    type: String,
+    enum: ['in_progress', 'completed'],
+    default: 'completed'
+  },
   submittedAt: {
     type: Date,
     default: Date.now

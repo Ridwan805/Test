@@ -19,7 +19,7 @@ export default function AssessmentWorksheet({
   onSubmitted = () => {}
 }) {
   const { user } = useContext(AuthContext);
-  const isAdmin = Boolean(user?.is_staff || localStorage.getItem('user_is_staff') === 'true');
+  const isAdmin = user ? Boolean(user.is_staff) : localStorage.getItem('user_is_staff') === 'true';
 
   const targetMod = parseInt(moduleNumber, 10) || 2;
   const isMod4 = targetMod === 4;
@@ -50,12 +50,15 @@ export default function AssessmentWorksheet({
   const [viewMode, setViewMode] = useState('notebook');
   const [gradingStep, setGradingStep] = useState('');
   const [notebookKey, setNotebookKey] = useState(0);
+  const [isEnlarged, setIsEnlarged] = useState(false);
 
-  // Quiz Timer & Admin Controls State
-  const timeLimitMinutes = assessmentData?.assessment?.timeLimitMinutes ?? 30;
+  // Quiz Timer & Admin Controls State (Server-Authoritative)
+  const timeLimitMinutes = assessmentData?.assessment?.timer?.durationMinutes ?? assessmentData?.assessment?.timeLimitMinutes ?? 30;
   const [timeRemaining, setTimeRemaining] = useState(timeLimitMinutes * 60);
-  const [timerActive, setTimerActive] = useState(!isHomework);
+  const [serverExpiresAt, setServerExpiresAt] = useState(null);
+  const [timerActive, setTimerActive] = useState(false);
   const [showAdminControls, setShowAdminControls] = useState(false);
+  const [showStartConfirmation, setShowStartConfirmation] = useState(false);
   const [adminMinutes, setAdminMinutes] = useState(30);
   const [isSavingTimer, setIsSavingTimer] = useState(false);
   const [adminTimerMsg, setAdminTimerMsg] = useState('');
@@ -63,17 +66,44 @@ export default function AssessmentWorksheet({
   const handleNotebookSubmitRef = useRef();
   const handleSubmitRef = useRef();
 
+  // Quiz Readiness Gate State
+  const [quizStarted, setQuizStarted] = useState(isHomework);
+
   useEffect(() => {
     setViewMode('notebook');
     setSubmissionResult(null);
     hasAutoSubmittedRef.current = false;
-  }, [assessmentType, moduleNumber]);
+    setIsEnlarged(false);
+    setShowStartConfirmation(false);
+    if (isHomework) {
+      setQuizStarted(true);
+    }
+  }, [assessmentType, moduleNumber, courseSlug, targetMod, isHomework]);
 
   useEffect(() => {
     if (assessmentData?.assessment?.timeLimitMinutes !== undefined) {
       setAdminMinutes(assessmentData.assessment.timeLimitMinutes);
     }
   }, [assessmentData]);
+
+  // Handle body overflow and Escape key for enlarged mode
+  useEffect(() => {
+    if (isEnlarged) {
+      document.body.style.overflow = 'hidden';
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          setIsEnlarged(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [isEnlarged]);
 
   // Fetch assessment metadata and previous attempts
   useEffect(() => {
@@ -228,6 +258,22 @@ export default function AssessmentWorksheet({
             });
           }
           setStudentCode(initialCode);
+
+          // Configure server-authoritative quiz timer session
+          if (!isHomework) {
+            if (data.activeQuizSession) {
+              setServerExpiresAt(data.activeQuizSession.expiresAt);
+              setTimeRemaining(data.activeQuizSession.remainingSeconds);
+              setQuizStarted(true);
+              setTimerActive(data.activeQuizSession.remainingSeconds > 0 && !submissionResult);
+            } else {
+              setServerExpiresAt(null);
+              setQuizStarted(false);
+              setTimerActive(false);
+              const duration = data.assessment?.timer?.durationMinutes || data.assessment?.timeLimitMinutes || 30;
+              setTimeRemaining(duration * 60);
+            }
+          }
         }
       } catch (err) {
         if (isMounted) setError(err.message);
@@ -285,7 +331,8 @@ export default function AssessmentWorksheet({
         body: JSON.stringify({
           questionResults,
           submittedCode: studentCode,
-          moduleNumber: targetMod
+          moduleNumber: targetMod,
+          submissionReason: (!isHomework && timeRemaining <= 0) ? 'time_expired' : 'manual'
         })
       });
 
@@ -324,6 +371,7 @@ export default function AssessmentWorksheet({
   };
 
   const handleNotebookSubmit = async () => {
+    if (isEnlarged) setIsEnlarged(false);
     setIsSubmitting(true);
     setGradingStep('Reading your notebook from workspace storage...');
 
@@ -382,7 +430,8 @@ export default function AssessmentWorksheet({
         body: JSON.stringify({
           questionResults,
           submittedCode: extractedCode,
-          moduleNumber: targetMod
+          moduleNumber: targetMod,
+          submissionReason: (!isHomework && timeRemaining <= 0) ? 'time_expired' : 'manual'
         })
       });
 
@@ -424,61 +473,75 @@ export default function AssessmentWorksheet({
   handleNotebookSubmitRef.current = handleNotebookSubmit;
   handleSubmitRef.current = handleSubmit;
 
-  // Initialize and track quiz timer in localStorage
+  // Server-Authoritative Countdown timer effect
   useEffect(() => {
-    if (isHomework) return;
-    const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
-    const totalSecs = (assessmentData?.assessment?.timeLimitMinutes ?? 30) * 60;
-    const stored = localStorage.getItem(timerKey);
-    let initialSecs = totalSecs;
-
-    if (stored) {
-      const startTime = parseInt(stored, 10);
-      const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      initialSecs = Math.max(0, totalSecs - elapsed);
-    } else {
-      localStorage.setItem(timerKey, Date.now().toString());
-    }
-
-    setTimeRemaining(initialSecs);
-    setTimerActive(initialSecs > 0 && !submissionResult);
-  }, [assessmentType, targetMod, courseSlug, assessmentData?.assessment?.timeLimitMinutes, isHomework, submissionResult]);
-
-  // Countdown timer effect
-  useEffect(() => {
-    if (isHomework || !timerActive || submissionResult || isSubmitting) return;
+    // Admins are supervisors inspecting the quiz and are never force-submitted or timed out
+    if (isHomework || !timerActive || submissionResult || isSubmitting || !quizStarted || isAdmin) return;
 
     const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setTimerActive(false);
-          if (!hasAutoSubmittedRef.current) {
-            hasAutoSubmittedRef.current = true;
-            alert('⏰ Quiz time has expired! Your answers are being submitted automatically for official grading.');
-            if (viewMode === 'notebook') {
-              handleNotebookSubmitRef.current?.();
-            } else {
-              handleSubmitRef.current?.();
-            }
+      let left;
+      if (serverExpiresAt) {
+        left = Math.max(0, Math.floor((new Date(serverExpiresAt).getTime() - Date.now()) / 1000));
+      } else {
+        left = Math.max(0, timeRemaining - 1);
+      }
+
+      setTimeRemaining(left);
+
+      if (left <= 0) {
+        clearInterval(interval);
+        setTimerActive(false);
+        if (!hasAutoSubmittedRef.current) {
+          hasAutoSubmittedRef.current = true;
+          alert('⏰ Quiz time has expired! Your answers are being submitted automatically for official grading.');
+          if (viewMode === 'notebook') {
+            handleNotebookSubmitRef.current?.();
+          } else {
+            handleSubmitRef.current?.();
           }
-          return 0;
         }
-        return prev - 1;
-      });
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isHomework, timerActive, submissionResult, isSubmitting, viewMode]);
+  }, [isHomework, timerActive, submissionResult, isSubmitting, viewMode, quizStarted, serverExpiresAt, isAdmin]);
+
+  const handlePromptStartQuiz = () => {
+    setShowStartConfirmation(true);
+  };
+
+  const handleConfirmStartQuiz = async () => {
+    try {
+      setShowStartConfirmation(false);
+      const res = await apiFetch(`/api/courses/${courseSlug}/assessments/quiz/start?module=${targetMod}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleNumber: targetMod })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to start quiz session on server');
+      }
+      const data = await res.json();
+      setServerExpiresAt(data.expiresAt);
+      setTimeRemaining(data.remainingSeconds);
+      setTimerActive(true);
+      setQuizStarted(true);
+      hasAutoSubmittedRef.current = false;
+    } catch (err) {
+      alert(`Could not start quiz: ${err.message}`);
+    }
+  };
 
   const handleRetry = () => {
     setSubmissionResult(null);
     hasAutoSubmittedRef.current = false;
     if (!isHomework) {
-      const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
-      localStorage.setItem(timerKey, Date.now().toString());
-      setTimeRemaining((assessmentData?.assessment?.timeLimitMinutes || 30) * 60);
-      setTimerActive(true);
+      setServerExpiresAt(null);
+      setQuizStarted(false);
+      setTimerActive(false);
+      const duration = assessmentData?.assessment?.timer?.durationMinutes || assessmentData?.assessment?.timeLimitMinutes || 30;
+      setTimeRemaining(duration * 60);
     }
   };
 
@@ -503,8 +566,6 @@ export default function AssessmentWorksheet({
           timeLimitMinutes: data.timeLimitMinutes
         }
       }));
-      const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
-      localStorage.setItem(timerKey, Date.now().toString());
       setTimeRemaining(data.timeLimitMinutes * 60);
       setTimerActive(true);
       hasAutoSubmittedRef.current = false;
@@ -518,9 +579,7 @@ export default function AssessmentWorksheet({
   };
 
   const handleResetStudentTimer = () => {
-    const timerKey = `quiz_timer_start_${courseSlug}_mod${targetMod}`;
-    localStorage.setItem(timerKey, Date.now().toString());
-    const limitMins = assessmentData?.assessment?.timeLimitMinutes ?? 30;
+    const limitMins = assessmentData?.assessment?.timer?.durationMinutes ?? assessmentData?.assessment?.timeLimitMinutes ?? 30;
     setTimeRemaining(limitMins * 60);
     setTimerActive(true);
     hasAutoSubmittedRef.current = false;
@@ -610,8 +669,148 @@ export default function AssessmentWorksheet({
   const adminParam = isAdmin ? '&admin=1' : '&admin=0';
   const fullNotebookUrl = `/lite/notebooks/index.html?path=${encodeURIComponent(notebookPath)}${adminParam}`;
 
+  // Quiz Readiness Gate (Asks student permission before starting the timed quiz; bypassed for admin supervisors)
+  if (!isHomework && !quizStarted && !submissionResult && !isAdmin) {
+    return (
+      <div className="assessment-worksheet">
+        <div className="quiz-readiness-card">
+          <div className="readiness-hero-icon">⚡</div>
+          <div className="readiness-badges">
+            <span className="pill-badge pill-type">TIMED CODING ASSESSMENT</span>
+            <span className="pill-badge pill-level">WEIGHT: 60%</span>
+            <span className="pill-badge pill-points">MAX: {assessment.maxPoints} MARKS</span>
+            <span className="pill-badge pill-time">⏱️ {assessment.timeLimitMinutes || 30} MINUTES</span>
+          </div>
+
+          <h1 className="readiness-title">{assessment.title}</h1>
+          <p className="readiness-subtitle">
+            You are about to start the official graded coding quiz for <strong>Module {targetMod}</strong>. Confirm your readiness to begin the timed examination.
+          </p>
+
+          <div className="readiness-instructions-grid">
+            <div className="readiness-rule-item">
+              <span className="rule-icon">🕒</span>
+              <div>
+                <strong>{assessment.timeLimitMinutes || 30}-Minute Live Countdown</strong>
+                <p>The timer begins the moment you click "Start Quiz Now". It persists in your browser and keeps running even if you refresh.</p>
+              </div>
+            </div>
+            <div className="readiness-rule-item">
+              <span className="rule-icon">⛶</span>
+              <div>
+                <strong>Enlargeable Full-Screen Notebook</strong>
+                <p>Click "⛶ Enlarge Workspace" at any time to expand the notebook to full screen for maximum coding comfort and distraction-free solving.</p>
+              </div>
+            </div>
+            <div className="readiness-rule-item">
+              <span className="rule-icon">🤖</span>
+              <div>
+                <strong>Automated Pyodide Grading</strong>
+                <p>When you click submit or when the timer reaches 00:00, your notebook answers will be evaluated with automated assertions.</p>
+              </div>
+            </div>
+            <div className="readiness-rule-item">
+              <span className="rule-icon">🎯</span>
+              <div>
+                <strong>80% Combined Passing Mark</strong>
+                <p>Module {targetMod + 1} unlocks when your combined grade (40% Homework + 60% Quiz) reaches 80% or higher.</p>
+              </div>
+            </div>
+          </div>
+
+          {bestScore > 0 && (
+            <div className="readiness-best-banner">
+              🏆 Your Best Score So Far: <strong>{bestScore} / {assessment.maxPoints} ({bestPercentage}%)</strong>. Starting a new attempt will begin a fresh timed session.
+            </div>
+          )}
+
+          <div className="readiness-cta-row">
+            <button
+              type="button"
+              className="btn btn-primary btn-start-quiz-large"
+              onClick={handlePromptStartQuiz}
+            >
+              🚀 I Am Ready — Start Quiz Now →
+            </button>
+            <a
+              href={`/learn/${courseSlug}/module/${targetMod}`}
+              className="btn btn-outline"
+            >
+              ← Back to Module Overview
+            </a>
+          </div>
+        </div>
+
+        {/* CONFIRMATION MODAL BEFORE STARTING TIMED QUIZ */}
+        {showStartConfirmation && (
+          <div className="admin-modal-overlay">
+            <div className="admin-modal-box confirmation-box" style={{ maxWidth: '500px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: 0 }}>
+              <div className="modal-header" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '1.15rem' }}>Confirm Timed Examination Start</h3>
+                <button type="button" className="btn-modal-close" onClick={() => setShowStartConfirmation(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.25rem', cursor: 'pointer' }}>✕</button>
+              </div>
+              <div className="modal-body-padded" style={{ padding: '1.5rem', color: '#cbd5e1' }}>
+                <p style={{ margin: '0 0 1rem 0', fontSize: '1rem', lineHeight: 1.5 }}>
+                  Once you start, the <strong>{assessment?.timer?.durationMinutes || assessment?.timeLimitMinutes || 30}-minute</strong> timer begins on the server and cannot normally be paused.
+                </p>
+                <div style={{ background: '#1e1b12', border: '1px solid #78350f', borderRadius: '8px', padding: '0.75rem 1rem', color: '#fde68a', fontSize: '0.85rem' }}>
+                  ⚠️ Leaving, refreshing, or closing the browser will NOT stop or reset the server timer. Submissions upon expiry are recorded automatically.
+                </div>
+              </div>
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem', borderTop: '1px solid #1e293b', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setShowStartConfirmation(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleConfirmStartQuiz}
+                >
+                  Confirm & Start Quiz →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="assessment-worksheet">
+      {/* Academy Administrator Supervisor Banner */}
+      {isAdmin && (
+        <div className="admin-supervisor-badge-bar">
+          <div className="admin-supervisor-info">
+            <span className="admin-crown-icon">👑</span>
+            <div>
+              <strong>Academy Administrator Supervisor Mode</strong>
+              <div className="admin-supervisor-hint">
+                Student countdown limits, auto-submit alerts, and prerequisite locks are bypassed for your account.
+              </div>
+            </div>
+          </div>
+          <div className="admin-supervisor-actions">
+            <Link to="/admin" className="btn-admin-nav-pill">
+              ← Admin Console
+            </Link>
+            {!isHomework && (
+              <button
+                type="button"
+                className="btn-admin-nav-pill btn-admin-timer-pill"
+                onClick={() => setShowAdminControls((s) => !s)}
+              >
+                ⚙️ {showAdminControls ? 'Close Timer Config' : 'Configure Quiz Timer'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Assessment Header Card / Top Control Bar */}
       {viewMode === 'notebook' ? (
         <div className="worksheet-header-card homework-integrated-header">
@@ -629,7 +828,7 @@ export default function AssessmentWorksheet({
               )}
               {!isHomework && (
                 <span className={`pill-badge quiz-timer-pill ${timerStatusClass}`} title="Time remaining for this quiz">
-                  ⏱️ {formatTimer(timeRemaining)}
+                  ⏱️ {isAdmin ? `${formatTimer(timeRemaining)} (Admin Bypass)` : formatTimer(timeRemaining)}
                 </span>
               )}
             </div>
@@ -645,6 +844,14 @@ export default function AssessmentWorksheet({
                   ⚙️ Admin Timer
                 </button>
               )}
+              <button
+                type="button"
+                className="btn-open-notebook-tab"
+                onClick={() => setIsEnlarged(!isEnlarged)}
+                title={isEnlarged ? 'Exit full screen (Esc)' : 'Enlarge workspace to full screen'}
+              >
+                {isEnlarged ? '⤓ Minimize' : '⛶ Enlarge'}
+              </button>
               <a
                 href={fullNotebookUrl}
                 target="_blank"
@@ -827,9 +1034,17 @@ export default function AssessmentWorksheet({
         </div>
       )}
 
+      {/* Subtle Warning Threshold Banner (at <= 5 mins remaining) */}
+      {!isHomework && quizStarted && timeRemaining <= 300 && timeRemaining > 0 && !submissionResult && (
+        <div className="quiz-warning-banner" style={{ background: '#451a03', color: '#fef3c7', padding: '0.75rem 1.25rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid #d97706', display: 'flex', alignItems: 'center', gap: '0.65rem', fontWeight: 600, fontSize: '0.925rem' }}>
+          <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+          <span>5 minutes remaining. Please finish your code and prepare to submit.</span>
+        </div>
+      )}
+
       {/* Integrated Jupyter Notebook Mode vs Classic Questions Form */}
       {viewMode === 'notebook' ? (
-        <div className="integrated-jupyter-workspace-wrapper">
+        <div className={`integrated-jupyter-workspace-wrapper ${isEnlarged ? 'workspace-enlarged' : ''}`}>
           <div className="jupyter-workspace-meta-banner">
             <div className="meta-banner-left">
               <span className="meta-banner-dot" />
@@ -837,12 +1052,20 @@ export default function AssessmentWorksheet({
                 EcoIntuition Academy Integrated Notebook &bull; <strong>{notebookPath}</strong>
               </span>
             </div>
-            <div className="meta-banner-right" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="meta-banner-right" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
               {!isHomework && (
                 <span className={`quiz-meta-timer-bar ${timerStatusClass}`}>
                   ⏱️ <strong>{formatTimer(timeRemaining)}</strong>
                 </span>
               )}
+              <button
+                type="button"
+                className="btn-enlarge-notebook"
+                onClick={() => setIsEnlarged(!isEnlarged)}
+                title={isEnlarged ? 'Restore normal view (Esc)' : 'Enlarge notebook to full screen'}
+              >
+                {isEnlarged ? '⤓ Minimize (Esc)' : '⛶ Enlarge Workspace'}
+              </button>
               <span className="meta-tip">
                 💡 Tip: Solve problems inside the notebook. Run with <strong>Shift + Enter</strong>.
               </span>
@@ -869,21 +1092,36 @@ export default function AssessmentWorksheet({
                   : 'Clicking Submit extracts all answers from your quiz notebook, evaluates test cases against official grading assertions, records your final score, and updates your course progression.'}
               </p>
             </div>
-            <button
-              type="button"
-              className="btn btn-primary btn-submit-notebook-bottom"
-              onClick={handleNotebookSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <span className="live-spinner-icon" />
-                  <span>{gradingStep || 'Grading Notebook...'}</span>
-                </>
-              ) : (
-                `🚀 Submit & Grade ${isHomework ? 'Homework' : 'Quiz'} Notebook (${assessment.maxPoints} Marks) →`
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {isEnlarged && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setIsEnlarged(false)}
+                  style={{ color: '#F8FAFC', borderColor: '#475569' }}
+                >
+                  ⤓ Minimize View
+                </button>
               )}
-            </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-submit-notebook-bottom"
+                onClick={() => {
+                  if (isEnlarged) setIsEnlarged(false);
+                  handleNotebookSubmit();
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="live-spinner-icon" />
+                    <span>{gradingStep || 'Grading Notebook...'}</span>
+                  </>
+                ) : (
+                  `🚀 Submit & Grade ${isHomework ? 'Homework' : 'Quiz'} Notebook (${assessment.maxPoints} Marks) →`
+                )}
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -1000,6 +1238,14 @@ export default function AssessmentWorksheet({
               </span>
             </div>
           </div>
+
+          {/* Time Expired Notice */}
+          {submissionResult.attempt?.submissionReason === 'time_expired' && (
+            <div className="time-expired-alert" style={{ background: '#450a0a', color: '#fecaca', padding: '1rem 1.25rem', borderRadius: '8px', margin: '1.25rem 0', border: '1px solid #dc2626' }}>
+              <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1.1rem', color: '#fee2e2' }}>⏰ Time is Up</h4>
+              <p style={{ margin: 0, fontSize: '0.95rem' }}>Your current answers were submitted automatically upon examination timer expiration.</p>
+            </div>
+          )}
 
           {/* Module Combined Progression Breakdown */}
           {submissionResult.moduleGradeSummary && (

@@ -5920,3 +5920,285 @@ h1, h2, h3, h4, h5, h6 {
   margin-left: 0.25rem;
 }
 
+/* ==========================================================================
+   Enlarged Full-Screen Workspace
+   ========================================================================== */
+.btn-enlarge-notebook {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #F8FAFC;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-enlarge-notebook:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: #38BDF8;
+  color: #38BDF8;
+}
+
+.integrated-jupyter-workspace-wrapper.workspace-enlarged {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 999999 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #0B0F19 !important;
+  box-shadow: none !important;
+}
+
+.workspace-enlarged .jupyter-workspace-meta-banner {
+  flex: 0 0 auto;
+  padding: 0.85rem 1.75rem;
+  background: #0B0F19;
+  border-bottom: 1px solid #1E293B;
+}
+
+.workspace-enlarged .integrated-jupyter-frame-container {
+  flex: 1 1 auto !important;
+  height: calc(100vh - 140px) !important;
+  background: #F8FAFC;
+}
+
+.workspace-enlarged .notebook-bottom-submit-banner {
+  flex: 0 0 auto;
+  padding: 0.85rem 1.75rem;
+  background: #0F172A;
+  border-top: 1px solid #1E293B;
+  color: #F8FAFC;
+}
+
+.workspace-enlarged .bottom-submit-info h4 {
+  color: #F8FAFC;
+  font-size: 1rem;
+}
+
+.workspace-enlarged .bottom-submit-info p {
+  color: #94A3B8;
+  font-size: 0.82rem;
+}
+
+/* ==========================================================================
+   Quiz Readiness Gate / Permission Card
+   ========================================================================== */
+.quiz-readiness-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 3rem 2.5rem;
+  max-width: 860px;
+  margin: 2rem auto;
+  box-shadow: 0 10px 35px rgba(15, 23, 42, 0.06);
+  text-align: center;
+}
+
+.readiness-hero-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  border: 2px solid #BFDBFE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin: 0 auto 1.5rem auto;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.readiness-badges {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.readiness-title {
+  font-family: var(--font-heading, sans-serif);
+  font-size: 1.95rem;
+  color: var(--color-brand, #0F172A);
+  margin: 0 0 0.75rem 0;
+}
+
+.readiness-subtitle {
+  font-size: 1.05rem;
+  color: #64748B;
+  max-width: 660px;
+  margin: 0 auto 2rem auto;
+  line-height: 1.6;
+}
+
+.readiness-instructions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  text-align: left;
+  margin-bottom: 2.25rem;
+}
+
+.readiness-rule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 1.15rem 1.25rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.readiness-rule-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.readiness-rule-item .rule-icon {
+  font-size: 1.5rem;
+  flex: 0 0 auto;
+}
+
+.readiness-rule-item strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #0F172A;
+  margin-bottom: 0.25rem;
+}
+
+.readiness-rule-item p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748B;
+  line-height: 1.45;
+}
+
+.readiness-best-banner {
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+  color: #92400E;
+}
+
+.readiness-cta-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.btn-start-quiz-large {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 0.95rem 2.25rem;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: 1px solid #10B981;
+  color: #FFFFFF;
+  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.35);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-start-quiz-large:hover {
+  background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.45);
+}
+
+/* ==========================================================================
+   Admin Supervisor Banner in Assessment Worksheet
+   ========================================================================== */
+.admin-supervisor-badge-bar {
+  background: linear-gradient(135deg, #064E3B 0%, #065F46 100%);
+  border: 1px solid #10B981;
+  border-radius: 12px;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  color: #ECFDF5;
+  box-shadow: 0 4px 14px rgba(6, 78, 59, 0.25);
+}
+
+.admin-supervisor-info {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.admin-crown-icon {
+  font-size: 1.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-supervisor-hint {
+  font-size: 0.82rem;
+  color: #A7F3D0;
+  margin-top: 0.15rem;
+}
+
+.admin-supervisor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.btn-admin-nav-pill {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-admin-nav-pill:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.btn-admin-timer-pill {
+  background: #047857;
+  border-color: #34D399;
+}
+
+.btn-admin-timer-pill:hover {
+  background: #059669;
+}
+
+

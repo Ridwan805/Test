@@ -118,11 +118,11 @@ export default function Navbar() {
             </NavLink>
             {user && (
               <NavLink
-                to="/dashboard"
+                to={user?.is_staff ? '/admin' : '/dashboard'}
                 className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
                 onClick={closeMenu}
               >
-                Dashboard
+                {user?.is_staff ? '👑 Admin Console' : 'Dashboard'}
               </NavLink>
             )}
           </nav>
@@ -130,8 +130,12 @@ export default function Navbar() {
           <div className="auth-buttons">
             {user ? (
               <>
-                <Link to="/dashboard" className="btn btn-secondary btn-sm" onClick={closeMenu}>
-                  Dashboard
+                <Link
+                  to={user?.is_staff ? '/admin' : '/dashboard'}
+                  className={`btn ${user?.is_staff ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                  onClick={closeMenu}
+                >
+                  {user?.is_staff ? '👑 Admin Console' : 'Dashboard'}
                 </Link>
                 <button
                   type="button"

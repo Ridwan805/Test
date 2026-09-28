@@ -14,6 +14,7 @@ import {
 import {
   getModuleGradeHandler,
   getAssessmentDetailHandler,
+  startAssessmentQuizHandler,
   submitAssessmentAttemptHandler,
   updateAssessmentTimerHandler
 } from '../controllers/assessmentController.js';
@@ -125,10 +126,16 @@ router.get('/:slug/modules', protect, async (req, res) => {
       progressMap.set(String(p.lessonId), p.completed);
     });
 
-    // Fetch Module 2, Module 3, and Module 4 grade summaries for progression gating
-    const mod2GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 2);
-    const mod3GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 3);
-    const mod4GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 4);
+    const isBootcamp = course.courseType === 'bootcamp' || course.slug === 'intro-to-python';
+    let mod2GradeSummary = null;
+    let mod3GradeSummary = null;
+    let mod4GradeSummary = null;
+
+    if (isBootcamp) {
+      mod2GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 2);
+      mod3GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 3);
+      mod4GradeSummary = await getModuleGradeSummary(req.user._id, course._id, 4);
+    }
 
     const curriculum = modules.map((m) => {
       const mObj = m.toJSON();
@@ -140,7 +147,11 @@ router.get('/:slug/modules', protect, async (req, res) => {
         }));
 
       // Role and progression rules:
-      if (m.moduleNumber === 1) {
+      if (!isBootcamp) {
+        // Standard Courses: self-paced, open completion without bootcamp gates
+        mObj.isLocked = false;
+        mObj.hasGradeRequirement = false;
+      } else if (m.moduleNumber === 1) {
         mObj.isLocked = false;
         mObj.hasGradeRequirement = false;
       } else if (m.moduleNumber === 2) {
@@ -149,17 +160,17 @@ router.get('/:slug/modules', protect, async (req, res) => {
         mObj.gradeSummary = mod2GradeSummary;
       } else if (m.moduleNumber === 3) {
         mObj.hasGradeRequirement = true;
-        mObj.isLocked = !mod2GradeSummary.passed && !req.user.is_staff;
+        mObj.isLocked = !mod2GradeSummary?.passed && !req.user.is_staff;
         mObj.lockReason = 'Complete Module 2 with at least 80% to unlock.';
         mObj.gradeSummary = mod3GradeSummary;
       } else if (m.moduleNumber === 4) {
         mObj.hasGradeRequirement = true;
-        mObj.isLocked = (!mod2GradeSummary.passed || !mod3GradeSummary.passed) && !req.user.is_staff;
+        mObj.isLocked = (!mod2GradeSummary?.passed || !mod3GradeSummary?.passed) && !req.user.is_staff;
         mObj.lockReason = 'Complete Module 3 with at least 80% to unlock.';
         mObj.gradeSummary = mod4GradeSummary;
       } else if (m.moduleNumber >= 5) {
         mObj.hasGradeRequirement = true;
-        mObj.isLocked = (!mod2GradeSummary.passed || !mod3GradeSummary.passed || !mod4GradeSummary.passed) && !req.user.is_staff;
+        mObj.isLocked = (!mod2GradeSummary?.passed || !mod3GradeSummary?.passed || !mod4GradeSummary?.passed) && !req.user.is_staff;
         mObj.lockReason = 'Complete Module 4 with at least 80% to unlock.';
       }
       return mObj;
@@ -208,52 +219,56 @@ router.get('/:slug/modules/:moduleNumber', protect, async (req, res) => {
       return res.status(404).json({ detail: 'Course not found' });
     }
 
-    // Backend Module Lock:
-    // Module 3 requires Module 2 grade >= 80%
-    if (moduleNumber === 3 && !req.user.is_staff) {
-      const mod2Grade = await getModuleGradeSummary(req.user._id, course._id, 2);
-      if (!mod2Grade.passed) {
-        return res.status(403).json({
-          detail: 'Module 3 is locked. Complete Module 2 with at least 80% to continue.',
-          locked: true,
-          moduleNumber,
-          module2Grade: mod2Grade.moduleGrade,
-          requiredGrade: 80,
-          homeworkPercentage: mod2Grade.homework.bestPercentage,
-          quizPercentage: mod2Grade.quiz.bestPercentage
-        });
-      }
-    }
+    const isBootcampCourse = course.courseType === 'bootcamp' || course.slug === 'intro-to-python';
 
-    // Module 4 requires Module 3 grade >= 80%
-    if (moduleNumber === 4 && !req.user.is_staff) {
-      const mod3Grade = await getModuleGradeSummary(req.user._id, course._id, 3);
-      if (!mod3Grade.passed) {
-        return res.status(403).json({
-          detail: 'Module 4 is locked. Complete Module 3 with at least 80% to continue.',
-          locked: true,
-          moduleNumber,
-          module3Grade: mod3Grade.moduleGrade,
-          requiredGrade: 80,
-          homeworkPercentage: mod3Grade.homework.bestPercentage,
-          quizPercentage: mod3Grade.quiz.bestPercentage
-        });
+    // Backend Module Lock (Only for Bootcamp programs):
+    if (isBootcampCourse && !req.user.is_staff) {
+      // Module 3 requires Module 2 grade >= 80%
+      if (moduleNumber === 3) {
+        const mod2Grade = await getModuleGradeSummary(req.user._id, course._id, 2);
+        if (!mod2Grade.passed) {
+          return res.status(403).json({
+            detail: 'Module 3 is locked. Complete Module 2 with at least 80% to continue.',
+            locked: true,
+            moduleNumber,
+            module2Grade: mod2Grade.moduleGrade,
+            requiredGrade: 80,
+            homeworkPercentage: mod2Grade.homework.bestPercentage,
+            quizPercentage: mod2Grade.quiz.bestPercentage
+          });
+        }
       }
-    }
 
-    // Module 5+ requires Module 4 grade >= 80%
-    if (moduleNumber >= 5 && !req.user.is_staff) {
-      const mod4Grade = await getModuleGradeSummary(req.user._id, course._id, 4);
-      if (!mod4Grade.passed) {
-        return res.status(403).json({
-          detail: 'Module 5 is locked. Complete Module 4 with at least 80% to continue.',
-          locked: true,
-          moduleNumber,
-          module4Grade: mod4Grade.moduleGrade,
-          requiredGrade: 80,
-          homeworkPercentage: mod4Grade.homework.bestPercentage,
-          quizPercentage: mod4Grade.quiz.bestPercentage
-        });
+      // Module 4 requires Module 3 grade >= 80%
+      if (moduleNumber === 4) {
+        const mod3Grade = await getModuleGradeSummary(req.user._id, course._id, 3);
+        if (!mod3Grade.passed) {
+          return res.status(403).json({
+            detail: 'Module 4 is locked. Complete Module 3 with at least 80% to continue.',
+            locked: true,
+            moduleNumber,
+            module3Grade: mod3Grade.moduleGrade,
+            requiredGrade: 80,
+            homeworkPercentage: mod3Grade.homework.bestPercentage,
+            quizPercentage: mod3Grade.quiz.bestPercentage
+          });
+        }
+      }
+
+      // Module 5+ requires Module 4 grade >= 80%
+      if (moduleNumber >= 5) {
+        const mod4Grade = await getModuleGradeSummary(req.user._id, course._id, 4);
+        if (!mod4Grade.passed) {
+          return res.status(403).json({
+            detail: 'Module 5 is locked. Complete Module 4 with at least 80% to continue.',
+            locked: true,
+            moduleNumber,
+            module4Grade: mod4Grade.moduleGrade,
+            requiredGrade: 80,
+            homeworkPercentage: mod4Grade.homework.bestPercentage,
+            quizPercentage: mod4Grade.quiz.bestPercentage
+          });
+        }
       }
     }
 
@@ -704,6 +719,10 @@ router.get('/:slug/modules/:moduleNumber/grade', protect, getModuleGradeHandler)
 // @route   GET /api/courses/:slug/assessments/:type
 // @desc    Get assessment metadata and student attempt history
 router.get('/:slug/assessments/:type', protect, getAssessmentDetailHandler);
+
+// @route   POST /api/courses/:slug/assessments/:type/start
+// @desc    Server-authoritative quiz timer initiation
+router.post('/:slug/assessments/:type/start', protect, startAssessmentQuizHandler);
 
 // @route   POST /api/courses/:slug/assessments/:type/submit
 // @desc    Submit assessment attempt, save result, recalculate module grade

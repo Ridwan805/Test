@@ -4,6 +4,7 @@ import Lesson from '../models/Lesson.js';
 import LessonProgress from '../models/LessonProgress.js';
 import AssessmentAttempt from '../models/AssessmentAttempt.js';
 import Assessment from '../models/Assessment.js';
+import User from '../models/User.js';
 import { getModuleGradeSummary } from './assessmentController.js';
 
 /**
@@ -427,3 +428,103 @@ export async function getStudentDashboard(req, res) {
     res.status(500).json({ detail: 'Failed to retrieve student dashboard data.' });
   }
 }
+
+/**
+ * Controller: GET /api/dashboard/admin
+ * Consolidated oversight metrics and controls for staff/admin
+ */
+export async function getAdminDashboard(req, res) {
+  try {
+    if (!req.user || !req.user.is_staff) {
+      return res.status(403).json({ detail: 'Admin privileges required' });
+    }
+
+    // 1. User & Student Counts
+    const students = await User.find({}, 'first_name last_name email is_staff createdAt date_joined')
+      .sort({ createdAt: -1 });
+    const studentCount = students.filter((u) => !u.is_staff).length;
+    const staffCount = students.filter((u) => u.is_staff).length;
+
+    // 2. Course & Module Counts
+    const courses = await Course.find();
+    const modules = await Module.find().sort({ courseId: 1, moduleNumber: 1 });
+    const lessonsCount = await Lesson.countDocuments();
+
+    // 3. Assessment & Timer Configs
+    const assessments = await Assessment.find()
+      .populate('moduleId', 'moduleNumber title')
+      .populate('courseId', 'slug title')
+      .sort({ moduleId: 1, type: 1 });
+
+    // 4. Submission Metrics & Recent Attempts
+    const totalAttempts = await AssessmentAttempt.countDocuments();
+    const recentAttempts = await AssessmentAttempt.find()
+      .populate('userId', 'first_name last_name email')
+      .populate('assessmentId', 'title type maxPoints weight')
+      .populate('moduleId', 'moduleNumber')
+      .populate('courseId', 'slug')
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    const passedAttempts = await AssessmentAttempt.countDocuments({ percentage: { $gte: 80 } });
+    const passRate = totalAttempts > 0 ? Math.round((passedAttempts / totalAttempts) * 100) : 0;
+
+    res.json({
+      adminUser: {
+        id: req.user._id,
+        email: req.user.email,
+        name: `${req.user.first_name || 'Admin'} ${req.user.last_name || ''}`.trim(),
+        role: 'Academy Staff Administrator'
+      },
+      stats: {
+        totalStudents: studentCount,
+        totalStaff: staffCount,
+        totalUsers: students.length,
+        totalCourses: courses.length,
+        totalModules: modules.length,
+        totalLessons: lessonsCount,
+        totalSubmissions: totalAttempts,
+        passRate
+      },
+      assessments: assessments.map((a) => ({
+        id: a._id,
+        title: a.title,
+        type: a.type,
+        slug: a.slug,
+        maxPoints: a.maxPoints,
+        weight: a.weight,
+        timeLimitMinutes: a.timeLimitMinutes ?? (a.type === 'quiz' ? 30 : 0),
+        courseSlug: a.courseId?.slug || 'intro-to-python',
+        moduleNumber: a.moduleId?.moduleNumber || 2,
+        moduleTitle: a.moduleId?.title || `Module ${a.moduleId?.moduleNumber || 2}`
+      })),
+      recentAttempts: recentAttempts.map((att) => ({
+        id: att._id,
+        studentName: att.userId ? `${att.userId.first_name || ''} ${att.userId.last_name || ''}`.trim() || att.userId.email : 'Unknown Scholar',
+        studentEmail: att.userId?.email || 'N/A',
+        assessmentTitle: att.assessmentId?.title || `${att.assessmentType === 'homework' ? 'Homework' : 'Coding Quiz'} Assessment`,
+        assessmentType: att.assessmentType,
+        courseSlug: att.courseId?.slug || 'intro-to-python',
+        moduleNumber: att.moduleId?.moduleNumber || 2,
+        earnedPoints: att.earnedPoints,
+        maxPoints: att.maxPoints,
+        percentage: att.percentage,
+        passed: att.percentage >= 80,
+        submittedAt: att.submittedAt || att.createdAt,
+        relativeTime: getRelativeTime(att.submittedAt || att.createdAt)
+      })),
+      students: students.map((s) => ({
+        id: s._id,
+        name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.email.split('@')[0],
+        email: s.email,
+        is_staff: Boolean(s.is_staff),
+        role: s.is_staff ? 'Staff Administrator' : 'Student Scholar',
+        date_joined: s.date_joined || s.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Admin Dashboard Controller Error:', error);
+    res.status(500).json({ detail: 'Failed to retrieve admin dashboard data.' });
+  }
+}
+

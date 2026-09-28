@@ -9,6 +9,7 @@ import User from './models/User.js';
 import Bootcamp from './models/Bootcamp.js';
 import bootcampRoutes from './routes/bootcampRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { seedPythonModule1 } from './seed/pythonModule1.js';
 import { seedPythonModule2 } from './seed/pythonModule2.js';
 import { seedPythonModule3 } from './seed/pythonModule3.js';
@@ -139,6 +140,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/bootcamps', bootcampRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Root & API welcome endpoints
 app.get(['/', '/api', '/api/'], (req, res) => {

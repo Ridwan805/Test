@@ -57,7 +57,11 @@ const lessonSchema = new mongoose.Schema({
           'jupyter',
           'table',
           'comparison',
-          'checkpoint'
+          'checkpoint',
+          'equation',
+          'definition',
+          'derivation',
+          'summary'
         ]
       },
       level: { type: Number, default: 2 },
@@ -76,6 +80,13 @@ const lessonSchema = new mongoose.Schema({
       items: [{ type: String }],
       title: { type: String, default: '' },
       url: { type: String, default: '' },
+      formula: { type: String, default: '' },
+      label: { type: String, default: '' },
+      explanation: { type: String, default: '' },
+      term: { type: String, default: '' },
+      definition: { type: String, default: '' },
+      steps: [{ type: String }],
+      caption: { type: String, default: '' },
       cards: [
         {
           title: String,

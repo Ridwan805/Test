@@ -3,12 +3,20 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardTopBar from '../components/dashboard/DashboardTopBar';
+import AdminDashboard from './AdminDashboard';
 import '../components/dashboard/StudentDashboard.css';
 import { apiFetch } from '../utils/apiFetch';
 
 export default function StudentDashboard() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  const isAdmin = user ? Boolean(user.is_staff) : localStorage.getItem('user_is_staff') === 'true';
+
+  // If user has administrative privileges, serve dedicated Admin Console
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
 
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);

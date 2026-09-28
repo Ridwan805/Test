@@ -13,6 +13,9 @@ export const protect = async (req, res, next) => {
       if (!req.user) {
         return res.status(401).json({ detail: 'User not found or token invalid' });
       }
+      if (req.user.is_active === false) {
+        return res.status(403).json({ detail: 'This account has been deactivated. Please contact support.' });
+      }
       return next();
     } catch (error) {
       console.error('Auth Middleware Error:', error.message);
@@ -23,4 +26,15 @@ export const protect = async (req, res, next) => {
   if (!token) {
     return res.status(401).json({ detail: 'Not authorized, no token provided' });
   }
+};
+
+/**
+ * Middleware: requireAdmin
+ * Enforces admin authorization for staff endpoints
+ */
+export const requireAdmin = (req, res, next) => {
+  if (req.user && req.user.is_staff) {
+    return next();
+  }
+  return res.status(403).json({ detail: 'Admin privileges required' });
 };

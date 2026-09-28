@@ -53,14 +53,29 @@ const assessmentSchema = new mongoose.Schema({
     type: Number,
     default: 30
   },
+  timer: {
+    enabled: { type: Boolean, default: true },
+    durationMinutes: { type: Number, default: 30 },
+    warningMinutes: { type: Number, default: 5 },
+    autoSubmit: { type: Boolean, default: true },
+    allowPause: { type: Boolean, default: false },
+    showTimer: { type: Boolean, default: true }
+  },
   questions: [
     {
       id: { type: String, required: true },
       title: { type: String, required: true },
       instructions: { type: String, default: '' },
+      type: { type: String, default: 'coding' },
       maxPoints: { type: Number, required: true },
       targetVariables: [{ type: String }],
-      order: { type: Number, default: 1 }
+      order: { type: Number, default: 1 },
+      starterCode: { type: String, default: '' },
+      hiddenTests: { type: String, default: '' },
+      publicTests: { type: String, default: '' },
+      referenceSolution: { type: String, default: '' },
+      studentCanEdit: { type: Boolean, default: true },
+      studentCanDelete: { type: Boolean, default: false }
     }
   ]
 }, {

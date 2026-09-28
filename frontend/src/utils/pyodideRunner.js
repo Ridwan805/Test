@@ -57,9 +57,33 @@ export async function runPythonCode(code) {
     const py = await getPyodide();
     let stdout = '';
     let stderr = '';
+    let lastPrompt = '';
 
-    py.setStdout({ batched: (msg) => { stdout += msg + '\n'; } });
-    py.setStderr({ batched: (msg) => { stderr += msg + '\n'; } });
+    py.setStdout({
+      batched: (msg) => {
+        stdout += msg + '\n';
+        lastPrompt = msg;
+      }
+    });
+    py.setStderr({
+      batched: (msg) => {
+        stderr += msg + '\n';
+      }
+    });
+
+    // Provide interactive stdin for input() calls
+    py.setStdin({
+      stdin: () => {
+        const promptText = lastPrompt ? `Python input(): ${lastPrompt}` : 'Enter input for Python program:';
+        const val = typeof window !== 'undefined' && window.prompt ? window.prompt(promptText) : '';
+        if (val === null) {
+          return '\n';
+        }
+        stdout += val + '\n';
+        return val + '\n';
+      },
+      isatty: true
+    });
 
     await py.runPythonAsync(code);
 

@@ -10,6 +10,7 @@ import CourseDashboard from './pages/CourseDashboard';
 import ModulePage from './pages/ModulePage';
 import LessonPage from './pages/LessonPage';
 import StudentDashboard from './pages/StudentDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Databank from './pages/Databank';
 import Shop from './pages/Shop';
@@ -21,7 +22,7 @@ import ForgotPassword from './pages/ForgotPassword';
 
 function AppLayout() {
   const location = useLocation();
-  const isDashboard = location.pathname.startsWith('/dashboard');
+  const isDashboard = location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -41,12 +42,20 @@ function AppLayout() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          {/* Authenticated Student Dashboard */}
+          {/* Authenticated Dashboards */}
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
                 <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute adminOnly={true}>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />

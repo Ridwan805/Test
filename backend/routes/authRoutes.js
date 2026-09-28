@@ -153,10 +153,23 @@ router.post('/login/', async (req, res) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (user && (await user.matchPassword(password))) {
+      if (user.is_active === false) {
+        return res.status(403).json({ detail: 'This account has been deactivated. Please contact an administrator.' });
+      }
+
       const access = generateAccessToken(user._id);
       const refresh = generateRefreshToken(user._id);
 
       res.json({
+        user: {
+          id: user._id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          is_staff: user.is_staff,
+          is_active: user.is_active,
+          date_joined: user.date_joined
+        },
         access,
         refresh
       });

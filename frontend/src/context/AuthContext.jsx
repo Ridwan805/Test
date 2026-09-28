@@ -115,7 +115,12 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('access_token', data.access);
       localStorage.setItem('refresh_token', data.refresh);
       
-      // Fetch profile
+      if (data.user) {
+        syncUserState(data.user);
+        return true;
+      }
+
+      // Fallback: Fetch profile
       const profileRes = await fetch('/api/auth/me/', {
         headers: {
           'Authorization': `Bearer ${data.access}`,
@@ -126,7 +131,7 @@ export const AuthProvider = ({ children }) => {
         syncUserState(profileData);
         return true;
       }
-      return false;
+      return true;
     } catch (err) {
       setError(err.message);
       return false;
