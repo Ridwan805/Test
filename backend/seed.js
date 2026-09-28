@@ -16,7 +16,7 @@ const seedData = async () => {
   const adminUser = await User.create({
     first_name: 'Admin',
     last_name: 'User',
-    email: 'admin@aintuitionacademy.com',
+    email: 'admin@ecointuitionacademy.com',
     password: 'adminpassword123',
     is_staff: true,
     is_active: true

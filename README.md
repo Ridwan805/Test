@@ -61,7 +61,7 @@ npm run seed
 ```
 
 Pre-configured development superuser:
-- **Email**: `admin@aintuition.com`
+- **Email**: `admin@ecointuitionacademy.com` (or `admin@ecointuition.com`)
 - **Password**: `adminpassword123`
 
 ### 4. Start Development Server
